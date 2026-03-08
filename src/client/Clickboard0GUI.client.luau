@@ -18,7 +18,7 @@ local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 
 local SoundService = game:GetService("SoundService")
 local sound = Instance.new("Sound")
-sound.SoundId = "rbxassetid://113208204325880"
+sound.SoundId = "rbxassetid://139009780109934"
 local function checkmuted()
 	if player:WaitForChild("Settings"):WaitForChild("SfxMuted").Value >= 1 then
 		sound.Volume = 0

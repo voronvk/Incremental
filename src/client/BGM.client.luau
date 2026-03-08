@@ -2,13 +2,11 @@ local SoundService = game:GetService("SoundService")
 local Players = game:GetService("Players")
 
 local songs = {
-	"rbxassetid://124633176679840",
-	"rbxassetid://126923940812861",
-	"rbxassetid://115025327000580",
-	"rbxassetid://128234752836015",
-	"rbxassetid://105234109166828",
-	"rbxassetid://126511190855925",
-	"rbxassetid://120507389979633",
+	"rbxassetid://140722099430139",
+	"rbxassetid://5410086218",
+	"rbxassetid://140009716850576",
+	"rbxassetid://140695633562281",
+	"rbxassetid://140683966043041",
 }
 
 local currentIndex = 1

@@ -33,11 +33,11 @@ local MAX_LEVEL = 50
 
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 
-local PRODUCT_ID_1 = 3461625487
-local PRODUCT_ID_2 = 3461625810
-local PRODUCT_ID_3 = 3461626222
-local PRODUCT_ID_4 = 3461626520
-local PRODUCT_ID_5 = 3461627003
+local PRODUCT_ID_1 = 3552350900
+local PRODUCT_ID_2 = 3552351508
+local PRODUCT_ID_3 = 3552351505
+local PRODUCT_ID_4 = 3552352195
+local PRODUCT_ID_5 = 3552352193
 
 local MarketplaceService = game:GetService("MarketplaceService")
 

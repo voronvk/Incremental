@@ -27,7 +27,7 @@ local RunService = game:GetService("RunService")
 
 local SoundService = game:GetService("SoundService")
 local sound = Instance.new("Sound")
-sound.SoundId = "rbxassetid://100841669467007"
+sound.SoundId = "rbxassetid://140206660137491"
 local function checkmuted()
 	if player:WaitForChild("Settings"):WaitForChild("SfxMuted").Value >= 1 then
 		sound.Volume = 0

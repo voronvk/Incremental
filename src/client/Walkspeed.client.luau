@@ -1,25 +1,19 @@
 local Players = game:GetService("Players")
-local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
+local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+local WALKSPEED_GAMEPASS_ID = 1740406688
+
 local upgrades = player:WaitForChild("Upgrades")
 local upgTree4 = upgrades:WaitForChild("UpgTree4")
 local upgtree2_28 = upgrades:WaitForChild("UpgTree2_28")
 local upgtree2_29 = upgrades:WaitForChild("UpgTree2_29")
 local defaultspeed = 16
 
-local ownsGamepass = false
-
 local function checkGamepass()
-	local success, result = pcall(function()
-		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, 1594634081)
-	end)
-	if success then
-		ownsGamepass = result
-	end
+	return GamePassCheck.playerOwnsGamePass(player, WALKSPEED_GAMEPASS_ID)
 end
-
-checkGamepass()
 
 local function applyWalkspeedBonus()
 	local character = player.Character or player.CharacterAdded:Wait()
@@ -27,7 +21,7 @@ local function applyWalkspeedBonus()
 	if not humanoid then return end
 
 	local speed = defaultspeed
-	checkGamepass()
+	local ownsGamepass = checkGamepass()
 
 	if upgTree4.Value == 1 then
 		speed = speed * 1.5

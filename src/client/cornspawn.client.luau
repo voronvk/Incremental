@@ -30,7 +30,7 @@ local clearCornEvent = ReplicatedStorage:WaitForChild("ClearLocalCornEvent")
 local SoundService = game:GetService("SoundService")
 
 local collectsound = Instance.new("Sound")
-collectsound.SoundId = "rbxassetid://126885384746784" -- climb
+collectsound.SoundId = "rbxassetid://101429032102613"
 -- collectsound.SoundId = "rbxassetid://71250259471548" -- dig
 -- collectsound.SoundId = "rbxassetid://105910802751420" -- puff
 local function checkmuted()
@@ -84,13 +84,13 @@ task.spawn(function()
 		local mult2 = (tier.Value >= 2) and tier.Value or 1
 		local luckmult = (upgtree2_6.Value == 1) and 2 or 1
 
-		local MarketplaceService = game:GetService("MarketplaceService")
+		local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 		local luckmult2 = 1
-		local success, hasPass = pcall(function()
-			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, 1595274739)
-		end)
-		if success and hasPass then
+		if GamePassCheck.playerOwnsGamePass(player, 1740516591) then
 			luckmult2 = 2
+		end
+		if GamePassCheck.playerOwnsGamePass(player, 1740686732) then
+			luckmult2 = luckmult2 * 2
 		end
 
 		local mult3 = (kernel5.Value * 0.02 + 1)

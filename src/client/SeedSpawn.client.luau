@@ -32,7 +32,7 @@ local upgtree10 = upgrades:WaitForChild("UpgTree10")
 local upgtree2_27 = upgrades:WaitForChild("UpgTree2_27")
 
 local collectsound = Instance.new("Sound")
-collectsound.SoundId = "rbxassetid://126885384746784" -- climb
+collectsound.SoundId = "rbxassetid://101429032102613"
 -- collectsound.SoundId = "rbxassetid://71250259471548" -- dig
 -- collectsound.SoundId = "rbxassetid://105910802751420" -- puff
 local function checkmuted()
@@ -81,14 +81,8 @@ task.spawn(function()
 			local goldenseeds = currencies:WaitForChild("GoldenSeeds")
 			local silverseeds = currencies:WaitForChild("SilverSeeds")
 
-			local MarketplaceService = game:GetService("MarketplaceService")
-			local luckmult = 1
-			local success, hasPass = pcall(function()
-				return MarketplaceService:UserOwnsGamePassAsync(player.UserId, 1594846165)
-			end)
-			if success and hasPass then
-				luckmult = 2
-			end
+			local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+			local luckmult = GamePassCheck.playerOwnsGamePass(player, 1740219830) and 2 or 1
 
 			local rubychance = 1 * luckmult
 			local diamondchance = 4 * luckmult

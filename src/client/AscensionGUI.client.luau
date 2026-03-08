@@ -18,7 +18,7 @@ local upgbutton = upgradePart:WaitForChild("ClickDetector")
 
 local SoundService = game:GetService("SoundService")
 local sound = Instance.new("Sound")
-sound.SoundId = "rbxassetid://100841669467007"
+sound.SoundId = "rbxassetid://140206660137491"
 local function checkmuted()
 	if player:WaitForChild("Settings"):WaitForChild("SfxMuted").Value >= 1 then
 		sound.Volume = 0
@@ -36,17 +36,8 @@ local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 
 local function updateLabel()
 
-	local ownsGamepass = false
-	local MarketplaceService = game:GetService("MarketplaceService")
-	local function checkGamepass()
-		local success, result = pcall(function()
-			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, 1595314670)
-		end)
-		if success then
-			ownsGamepass = result
-		end
-	end
-	checkGamepass()
+	local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+	local ownsGamepass = GamePassCheck.playerOwnsGamePass(player, 1740630375)
 
 	local cost = Cost
 	local boosters = upgrades:WaitForChild("Boosters")

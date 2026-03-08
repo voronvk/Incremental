@@ -24,7 +24,7 @@ local upgradeEvent = ReplicatedStorage:WaitForChild("RebirthEvent")
 -- SOUND
 local SoundService = game:GetService("SoundService")
 local sound = Instance.new("Sound")
-sound.SoundId = "rbxassetid://100841669467007"
+sound.SoundId = "rbxassetid://140206660137491"
 sound.Parent = SoundService
 
 local function checkmuted()
@@ -46,8 +46,8 @@ local upgTree1 = upgrades:WaitForChild("UpgTree1")
 local rebirthValue = upgrades:WaitForChild("RebirthValueUpg1")
 
 -- GAMEPASS
-local MarketplaceService = game:GetService("MarketplaceService")
-local REBIRTHS_GAMEPASS_ID = 1595416559
+local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+local REBIRTHS_GAMEPASS_ID = 1740115835
 
 -- COST FUNCTION
 local function getCost(level)
@@ -85,19 +85,7 @@ local function updateLabel()
 	local mult7 = ((rebirthenergy.Value + 1) ^ (1/5))
 	local mult8 = (tier.Value >= 1) and 2 or 1
 
-	local mult9 = 1
-
-	local success, ownsGamepass =
-		pcall(function()
-			return MarketplaceService:UserOwnsGamePassAsync(
-				player.UserId,
-				REBIRTHS_GAMEPASS_ID
-			)
-		end)
-
-	if success and ownsGamepass then
-		mult9 = 2
-	end
+	local mult9 = GamePassCheck.playerOwnsGamePass(player, REBIRTHS_GAMEPASS_ID) and 2 or 1
 
 	local mult10 =
 		(upgtree2_3.Value == 1)
