@@ -1,15 +1,27 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local menuGui = script.Parent
+
+local QUICKSHOP_PRODUCT_ID = 3553201276
 local ButtonScaleEffect = require(ReplicatedStorage.Shared:WaitForChild("ButtonScaleEffect"))
 
-local effectImage = menuGui:FindFirstChild("EffectImage")
-if effectImage then
+local effectImages = {}
+for _, desc in ipairs(menuGui:GetDescendants()) do
+	if desc.Name == "EffectImage" and desc:IsA("GuiObject") then
+		table.insert(effectImages, desc)
+	end
+end
+if #effectImages > 0 then
 	local ROTATION_SPEED = 20 -- grados por segundo
 	RunService.RenderStepped:Connect(function(dt)
-		effectImage.Rotation = effectImage.Rotation + ROTATION_SPEED * dt
+		for _, effectImage in ipairs(effectImages) do
+			if effectImage.Parent then
+				effectImage.Rotation = effectImage.Rotation + ROTATION_SPEED * dt
+			end
+		end
 	end)
 end
 
@@ -79,4 +91,13 @@ if menuButton then
 	if buttonImage then
 		ButtonScaleEffect.applyScaleEffect(menuButton, buttonImage)
 	end
+end
+
+-- QuickShop: comprar developer product directamente
+local quickShop = menuGui:FindFirstChild("QuickShop")
+if quickShop and quickShop:IsA("GuiButton") then
+	ButtonScaleEffect.applyScaleEffect(quickShop, quickShop:FindFirstChild("ImageLabel") or quickShop)
+	quickShop.Activated:Connect(function()
+		MarketplaceService:PromptProductPurchase(game.Players.LocalPlayer, QUICKSHOP_PRODUCT_ID)
+	end)
 end
