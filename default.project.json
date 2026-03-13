@@ -9,6 +9,9 @@
       },
       "BuyAllGamePasses": {
         "$className": "RemoteEvent"
+      },
+      "SetMuteRequest": {
+        "$className": "RemoteEvent"
       }
     },
 

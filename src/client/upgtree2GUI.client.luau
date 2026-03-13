@@ -87,7 +87,7 @@ for i = 1, 29 do
 	local config = UpgradeConfig[i] or {}
 	local cost = config.Cost or 1000000
 	local currencyName = config.Currency or "Corn"
-	local colorUnbought = config.ColorUnbought or Color3.fromRGB(255, 255, 127)
+	local colorUnbought = (i == 13) and Color3.fromRGB(255, 58, 58) or (config.ColorUnbought or Color3.fromRGB(255, 255, 127))
 	local colorBought = config.ColorBought or Color3.fromRGB(153, 153, 76)
 	local currency = currencyMap[currencyName]
 	local cosmeticCurrency = currencyName
