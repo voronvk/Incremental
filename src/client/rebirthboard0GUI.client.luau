@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
 local upgrades = player:WaitForChild("Upgrades")
@@ -48,6 +49,46 @@ local rebirthValue = upgrades:WaitForChild("RebirthValueUpg1")
 -- GAMEPASS
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 local REBIRTHS_GAMEPASS_ID = 1740115835
+
+-- Buscar recursivamente por si está anidado (ej: UpgradeGUI > Frame > UpgradePremium)
+local upgradePremium = surfaceGui:FindFirstChild("UpgradePremium", true)
+local deco = surfaceGui:FindFirstChild("Deco", true)
+
+local function updatePremiumVisibility()
+	if not upgradePremium or not deco then return end
+	local ownsGamepass = GamePassCheck.playerOwnsGamePass(player, REBIRTHS_GAMEPASS_ID)
+	upgradePremium.Visible = not ownsGamepass
+	deco.Visible = not ownsGamepass
+end
+
+if upgradePremium then
+	-- Click: mostrar popup del gamepass x2 Rebirth
+	local function promptGamepass()
+		MarketplaceService:PromptGamePassPurchase(player, REBIRTHS_GAMEPASS_ID)
+	end
+	local function connectClick(obj)
+		if not obj then return end
+		if obj:IsA("GuiButton") then
+			obj.Activated:Connect(promptGamepass)
+		elseif obj.MouseButton1Click then
+			obj.MouseButton1Click:Connect(promptGamepass)
+		end
+	end
+	connectClick(upgradePremium)
+	for _, child in ipairs(upgradePremium:GetDescendants()) do
+		if child:IsA("GuiButton") then
+			connectClick(child)
+			break
+		end
+	end
+	-- Ocultar al comprar
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, gamePassId, purchased)
+		if gamePassId == REBIRTHS_GAMEPASS_ID and purchased then
+			updatePremiumVisibility()
+		end
+	end)
+	updatePremiumVisibility()
+end
 
 -- COST FUNCTION
 local function getCost(level)

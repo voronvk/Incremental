@@ -16,6 +16,8 @@ task.defer(function()
 		or scroll:FindFirstChild("First Layout", true)
 	local secondLayout = scroll:FindFirstChild("SecondLayout", true)
 		or scroll:FindFirstChild("Second Layout", true)
+	local thirdLayout = scroll:FindFirstChild("ThirdLayout", true)
+		or scroll:FindFirstChild("Third Layout", true)
 
 -- BuyAll
 local BUNDLE_GAMEPASS_ID = 1740820575
@@ -43,6 +45,7 @@ local GAMEPASS_BY_NAME = {
 	["Ascension"] = 1740630375,
 	["x2 Walkspeed!"] = 1740406688,
 	["Walkspeed"] = 1740406688,
+	["Rebirth"] = 1740115835,
 }
 
 local function getGamePassId(gui)
@@ -87,5 +90,6 @@ end
 
 setupLayoutButtons(firstLayout, buyAll)
 setupLayoutButtons(secondLayout)
+setupLayoutButtons(thirdLayout)
 
 end) -- task.defer
