@@ -22,9 +22,35 @@
     },
 
     "StarterGui": {
-      "MenuGUI": {
+      "AudioGui": {
         "$className": "ScreenGui",
-        "$path": "src/StarterGui/MenuGUI"
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/AudioGui"
+      },
+      "AutoHarvest": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/AutoHarvest"
+      },
+      "BottomGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/BottomGui"
+      },
+      "DisplayGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/DisplayGui"
+      },
+      "RobuxGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/RobuxGui"
+      },
+      "ScreenGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/ScreenGui"
       }
     },
 

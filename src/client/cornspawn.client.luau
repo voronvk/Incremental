@@ -92,6 +92,8 @@ task.spawn(function()
 		if GamePassCheck.playerOwnsGamePass(player, 1740686732) then
 			luckmult2 = luckmult2 * 2
 		end
+		local luckBoost = player:GetAttribute("LuckBoostMultiplier") or 1
+		luckmult2 = luckmult2 * luckBoost
 
 		local mult3 = (kernel5.Value * 0.02 + 1)
 		local mult4 = (kernel4.Value * 0.05 + 1)

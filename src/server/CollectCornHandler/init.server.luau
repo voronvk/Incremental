@@ -3,6 +3,8 @@ local BadgeService = game:GetService("BadgeService")
 local event = ReplicatedStorage:WaitForChild("CollectCornEvent")
 local autoevent = ReplicatedStorage:WaitForChild("CollectCornEventAuto")
 
+local QuestSystem = require(script.Parent:WaitForChild("QuestSystem"))
+
 local Workspace = game:GetService("Workspace")
 local remoteMisuseTracker = {}
 local MAX_ATTEMPTS = 10
@@ -134,6 +136,7 @@ event.OnServerEvent:Connect(function(player, cornType)
 
 		cornStat.Value += totalValue
 		collects.Value += 1
+		QuestSystem.onCollectCorn(player, totalValue)
 
 		local seedcollects = events:WaitForChild("SeedCollects")
 		local seedcollectsactual = events:WaitForChild("SeedCollectsActual")
@@ -214,6 +217,7 @@ autoevent.OnServerEvent:Connect(function(player, cornType)
 
 		cornStat.Value += totalValue
 		collects.Value += 1
+		QuestSystem.onCollectCorn(player, totalValue)
 
 		local seedcollects = events:WaitForChild("SeedCollects")
 		local seedcollectsactual = events:WaitForChild("SeedCollectsActual")

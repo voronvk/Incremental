@@ -1,6 +1,12 @@
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
+
+-- QuickShop: +300% luck por 2 min, stackable
+local QUICKSHOP_LUCK_PRODUCT_ID = 3553201276
+local LUCK_BOOST_DURATION = 120 -- segundos
+local LUCK_BOOST_PER_STACK = 3 -- +300% = 4x por stack (1 + 3)
 
 -- Gemerald product IDs
 local GEM_PRODUCT_ID_1 = 3461625487
@@ -149,6 +155,14 @@ local function processReceipt(receiptInfo)
 		end
 		corn.Value += cornProductValues[productId].amount
 
+	elseif productId == QUICKSHOP_LUCK_PRODUCT_ID then
+		local endTimes = player:GetAttribute("LuckBoostEndTimes")
+		if type(endTimes) ~= "table" then
+			endTimes = {}
+		end
+		table.insert(endTimes, os.time() + LUCK_BOOST_DURATION)
+		player:SetAttribute("LuckBoostEndTimes", endTimes)
+
 	else
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -161,3 +175,24 @@ local function processReceipt(receiptInfo)
 end
 
 MarketplaceService.ProcessReceipt = processReceipt
+
+-- Actualizar LuckBoostMultiplier cada frame (limpiar expirados, calcular multiplicador)
+RunService.Heartbeat:Connect(function()
+	local now = os.time()
+	for _, player in ipairs(Players:GetPlayers()) do
+		local endTimes = player:GetAttribute("LuckBoostEndTimes")
+		if type(endTimes) == "table" and #endTimes > 0 then
+			local valid = {}
+			for _, et in ipairs(endTimes) do
+				if et > now then
+					table.insert(valid, et)
+				end
+			end
+			player:SetAttribute("LuckBoostEndTimes", valid)
+			local stacks = #valid
+			player:SetAttribute("LuckBoostMultiplier", 1 + (stacks * LUCK_BOOST_PER_STACK))
+		else
+			player:SetAttribute("LuckBoostMultiplier", 1)
+		end
+	end
+end)

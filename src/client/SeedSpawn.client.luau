@@ -83,6 +83,8 @@ task.spawn(function()
 
 			local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 			local luckmult = GamePassCheck.playerOwnsGamePass(player, 1740219830) and 2 or 1
+			local luckBoost = player:GetAttribute("LuckBoostMultiplier") or 1
+			luckmult = luckmult * luckBoost
 
 			local rubychance = 1 * luckmult
 			local diamondchance = 4 * luckmult

@@ -1,8 +1,12 @@
 local TweenService = game:GetService("TweenService")
 
 local NORMAL_SCALE = 1
-local HOVER_SCALE = 1.05 -- ligeramente más grande al hacer hover
+local HOVER_SCALE = 1.04 -- sutil
+local CLICK_SCALE = 0.96 -- efecto de "press" al hacer click (sutil)
 local TWEEN_TIME = 0.15
+local CLICK_TWEEN_TIME = 0.08 -- más rápido para el click
+
+local UIClickSound = require(script.Parent:WaitForChild("UIClickSound"))
 
 local function getOrCreateUIScale(guiObject)
 	local uiScale = guiObject:FindFirstChildOfClass("UIScale")
@@ -19,16 +23,20 @@ local function applyScaleEffect(button, imageLabel)
 		return
 	end
 
+	-- Sonido pop en cada click
+	UIClickSound.connectToButton(button)
+
 	local uiScale = getOrCreateUIScale(imageLabel)
 	uiScale.Scale = NORMAL_SCALE
-	local tweenInfo = TweenInfo.new(
-		TWEEN_TIME,
-		Enum.EasingStyle.Quad
-	)
+	local tweenInfo = TweenInfo.new(TWEEN_TIME, Enum.EasingStyle.Quad)
+	local clickTweenInfo = TweenInfo.new(CLICK_TWEEN_TIME, Enum.EasingStyle.Quad)
 
 	local function scaleTo(value)
-		local tween = TweenService:Create(uiScale, tweenInfo, { Scale = value })
-		tween:Play()
+		TweenService:Create(uiScale, tweenInfo, { Scale = value }):Play()
+	end
+
+	local function scaleToClick(value)
+		TweenService:Create(uiScale, clickTweenInfo, { Scale = value }):Play()
 	end
 
 	local isHovered = false
@@ -43,7 +51,7 @@ local function applyScaleEffect(button, imageLabel)
 	end)
 
 	button.MouseButton1Down:Connect(function()
-		scaleTo(HOVER_SCALE)
+		scaleToClick(CLICK_SCALE)
 	end)
 
 	button.MouseButton1Up:Connect(function()

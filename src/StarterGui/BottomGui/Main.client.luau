@@ -1,0 +1,1 @@
+-- BottomGui: script local (rellenar con la lógica de tu nueva UI)

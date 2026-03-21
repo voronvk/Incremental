@@ -1,9 +1,14 @@
+-- AudioGui: controles de audio (mute música/SFX)
+-- Lógica migrada desde src/client/AudioGui.client.luau
+-- Ajusta TurnOnButton/TurnOffButton según tu nueva UI
+
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local setMuteRequest = ReplicatedStorage:WaitForChild("SetMuteRequest")
+local audioGui = script.Parent
 
 local HOVER_SCALE = 1.2
 local NORMAL_SCALE = 1
@@ -11,13 +16,8 @@ local HOVER_ROTATION = 15
 local NORMAL_ROTATION = 0
 local TWEEN_TIME = 0.2
 
-local audioGui = player:WaitForChild("PlayerGui"):WaitForChild("AudioGui", 30)
-if not audioGui then
-	return
-end
-
-local turnOnButton = audioGui:WaitForChild("TurnOnButton", 10)
-local turnOffButton = audioGui:WaitForChild("TurnOffButton", 10)
+local turnOnButton = audioGui:FindFirstChild("TurnOnButton", true)
+local turnOffButton = audioGui:FindFirstChild("TurnOffButton", true)
 if not turnOnButton or not turnOffButton then
 	return
 end
@@ -61,14 +61,21 @@ updateButtonsFromSettings()
 local settings = player:WaitForChild("Settings")
 settings:WaitForChild("MusicMuted").Changed:Connect(updateButtonsFromSettings)
 
-turnOnButton.MouseButton1Click:Connect(function()
-	turnOnButton.Visible = false
-	turnOffButton.Visible = true
-	setMuteRequest:FireServer(true)
-end)
+local function connectClick(btn, muted)
+	if btn:IsA("GuiButton") then
+		btn.Activated:Connect(function()
+			turnOnButton.Visible = not muted
+			turnOffButton.Visible = muted
+			setMuteRequest:FireServer(muted)
+		end)
+	else
+		btn.MouseButton1Click:Connect(function()
+			turnOnButton.Visible = not muted
+			turnOffButton.Visible = muted
+			setMuteRequest:FireServer(muted)
+		end)
+	end
+end
 
-turnOffButton.MouseButton1Click:Connect(function()
-	turnOffButton.Visible = false
-	turnOnButton.Visible = true
-	setMuteRequest:FireServer(false)
-end)
+connectClick(turnOnButton, true)
+connectClick(turnOffButton, false)
