@@ -12,6 +12,9 @@
       },
       "SetMuteRequest": {
         "$className": "RemoteEvent"
+      },
+      "GamePassSyncRequest": {
+        "$className": "RemoteFunction"
       }
     },
 
@@ -41,6 +44,11 @@
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
         "$path": "src/StarterGui/DisplayGui"
+      },
+      "NewsGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/NewsGui"
       },
       "RobuxGui": {
         "$className": "ScreenGui",

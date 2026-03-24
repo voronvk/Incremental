@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
+local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 
 local CornFinder
 local ok, result = pcall(function()
@@ -168,10 +169,7 @@ end
 
 local hasGoldPass = false
 local function refreshGoldPassState()
-	local okPass, owns = pcall(function()
-		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, GOLD_GAMEPASS_ID)
-	end)
-	hasGoldPass = okPass and owns == true
+	hasGoldPass = GamePassCheck.playerOwnsGamePass(player, GOLD_GAMEPASS_ID)
 	if goldUnlock and goldUnlock:IsA("GuiObject") then
 		goldUnlock.Visible = not hasGoldPass
 	end
@@ -431,20 +429,6 @@ bindFrameButton(goldButton, goldState, function()
 	toggleAuto()
 end)
 
-MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(p, gamePassId, wasPurchased)
-	if p ~= player then
-		return
-	end
-	if gamePassId ~= GOLD_GAMEPASS_ID then
-		return
-	end
-	if wasPurchased then
-		task.wait(0.2)
-	end
-	refreshGoldPassState()
-	updateButtonColor()
-end)
-
 if goldUnlock and goldUnlock:IsA("GuiObject") then
 	goldUnlock:GetPropertyChangedSignal("Visible"):Connect(function()
 		if hasGoldPass and goldUnlock.Visible then
@@ -454,6 +438,11 @@ if goldUnlock and goldUnlock:IsA("GuiObject") then
 end
 
 player:GetAttributeChangedSignal("Auto"):Connect(updateButtonColor)
+
+player:GetAttributeChangedSignal("GamePassSyncStamp"):Connect(function()
+	refreshGoldPassState()
+	updateButtonColor()
+end)
 
 if goldContainer then
 	task.spawn(function()

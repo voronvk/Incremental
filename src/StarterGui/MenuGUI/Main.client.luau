@@ -7,6 +7,7 @@ local menuGui = script.Parent
 
 local QUICKSHOP_PRODUCT_ID = 3553201276
 local ButtonScaleEffect = require(ReplicatedStorage.Shared:WaitForChild("ButtonScaleEffect"))
+local UIBlur = require(ReplicatedStorage.Shared:WaitForChild("UIBlur"))
 
 local effectImages = {}
 for _, desc in ipairs(menuGui:GetDescendants()) do
@@ -38,6 +39,9 @@ if shop then
 	local isOpen = false
 
 	local function closeShop()
+		if isOpen then
+			UIBlur.endModal()
+		end
 		isOpen = false
 		shopScale.Scale = 0
 		shop.Visible = false
@@ -45,7 +49,13 @@ if shop then
 
 	if menuButton then
 		menuButton.Activated:Connect(function()
+			local wasOpen = isOpen
 			isOpen = not isOpen
+			if isOpen and not wasOpen then
+				UIBlur.beginModal()
+			elseif not isOpen and wasOpen then
+				UIBlur.endModal()
+			end
 			shop.Visible = true
 			local tween = TweenService:Create(shopScale, tweenInfo, {
 				Scale = isOpen and targetScale or 0

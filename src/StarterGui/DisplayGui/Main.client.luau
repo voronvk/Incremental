@@ -7,6 +7,7 @@ local player = Players.LocalPlayer
 local displayGui = script.Parent
 
 local ButtonScaleEffect = require(ReplicatedStorage.Shared:WaitForChild("ButtonScaleEffect"))
+local UIBlur = require(ReplicatedStorage.Shared:WaitForChild("UIBlur"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 
@@ -59,9 +60,12 @@ local buttonToFrame = {
 -- Datos de cada frame para poder cerrarlos
 local frameData = {}
 
-local function closeFrame(data)
+local function closeFrame(data, skipOverlayEnd: boolean?)
 	if not data.isOpen then return end
 	data.isOpen = false
+	if not skipOverlayEnd then
+		UIBlur.endModal()
+	end
 	local tween = TweenService:Create(data.uiScale, tweenInfo, { Scale = 0 })
 	tween.Completed:Connect(function()
 		data.frame.Visible = false
@@ -69,9 +73,12 @@ local function closeFrame(data)
 	tween:Play()
 end
 
-local function openFrame(data)
+local function openFrame(data, skipOverlayBegin: boolean?)
 	data.frame.Visible = true
 	data.isOpen = true
+	if not skipOverlayBegin then
+		UIBlur.beginModal()
+	end
 	TweenService:Create(data.uiScale, tweenInfo, { Scale = TARGET_SCALE }):Play()
 end
 
@@ -100,13 +107,19 @@ for buttonName, frameName in pairs(buttonToFrame) do
 			if data.isOpen then
 				closeFrame(data)
 			else
-				-- Cerrar cualquier otro frame abierto
+				local hadAnyOtherOpen = false
 				for name, other in pairs(frameData) do
-					if name ~= frameName then
-						closeFrame(other)
+					if name ~= frameName and other.isOpen then
+						hadAnyOtherOpen = true
+						break
 					end
 				end
-				openFrame(data)
+				for name, other in pairs(frameData) do
+					if name ~= frameName and other.isOpen then
+						closeFrame(other, true)
+					end
+				end
+				openFrame(data, hadAnyOtherOpen)
 			end
 		end
 
@@ -189,15 +202,7 @@ if shop and shopData then
 		end
 	end
 
-	-- Tras comprar o al cerrar el prompt (actualiza si ya posee)
-	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, _, wasPurchased)
-		if wasPurchased then
-			task.defer(refreshAllShopOwnedLabels)
-		end
-	end)
-
-	-- BuyAll / pack simulado
-	player:GetAttributeChangedSignal("SimulatedGamePasses"):Connect(function()
+	player:GetAttributeChangedSignal("GamePassSyncStamp"):Connect(function()
 		task.defer(refreshAllShopOwnedLabels)
 	end)
 

@@ -18,13 +18,21 @@ local function getOrCreateUIScale(guiObject)
 	return uiScale
 end
 
-local function applyScaleEffect(button, imageLabel)
+type ScaleEffectOptions = {
+	clickSoundId: (number | string)?,
+}
+
+local function applyScaleEffect(button, imageLabel, options: ScaleEffectOptions?)
 	if not button or not imageLabel then
 		return
 	end
 
-	-- Sonido pop en cada click
-	UIClickSound.connectToButton(button)
+	local soundId = options and options.clickSoundId
+	if soundId ~= nil then
+		UIClickSound.connectToButtonWithSoundId(button, soundId)
+	else
+		UIClickSound.connectToButton(button)
+	end
 
 	local uiScale = getOrCreateUIScale(imageLabel)
 	uiScale.Scale = NORMAL_SCALE

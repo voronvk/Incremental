@@ -42,6 +42,7 @@ end
 local plot = getSpawnPlot() or workspace:WaitForChild("FarmPlot")
 local SpawnHelper = require(ReplicatedStorage.Shared:WaitForChild("SpawnHelper"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 
 -- Templates: clonar desde ReplicatedStorage (añadir nuevos aquí o en la carpeta CornTemplates)
 local CORN_TEMPLATES = {
@@ -115,8 +116,12 @@ local function selectCornTemplate()
 
 	local luckMult = (upgtree2_6.Value == 1) and 2 or 1
 	local luckMult2 = 1
-	if GamePassCheck.playerOwnsGamePass(player, 1740516591) then luckMult2 = 2 end
-	if GamePassCheck.playerOwnsGamePass(player, 1740686732) then luckMult2 = luckMult2 * 2 end
+	if GamePassCheck.playerOwnsGamePass(player, GamePassConfig.GOLD_CORN_GAMEPASS_ID) then
+		luckMult2 = 2
+	end
+	if GamePassCheck.playerOwnsGamePass(player, GamePassConfig.MELON_X2_GAMEPASS_ID) then
+		luckMult2 = luckMult2 * 2
+	end
 	luckMult2 = luckMult2 * (player:GetAttribute("LuckBoostMultiplier") or 1)
 
 	local rubychance = 1 + rubySeeds * luckMult * luckMult2

@@ -17,6 +17,7 @@ local island3 = workspace:WaitForChild("Island3")
 local plot = island3:FindFirstChild("FarmPlot", true) or island3:WaitForChild("FarmPlot")
 local SpawnHelper = require(ReplicatedStorage.Shared:WaitForChild("SpawnHelper"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 
 local SEED_TEMPLATES = {
 	ReplicatedStorage:WaitForChild("BasicSeed"),
@@ -67,7 +68,7 @@ local function getSpawnPosition()
 end
 
 local function selectSeedTemplate()
-	local luckMult = GamePassCheck.playerOwnsGamePass(player, 1740219830) and 2 or 1
+	local luckMult = GamePassCheck.playerOwnsGamePass(player, GamePassConfig.LUCK_GAMEPASS_ID) and 2 or 1
 	luckMult = luckMult * (player:GetAttribute("LuckBoostMultiplier") or 1)
 
 	local rubychance = 1 * luckMult

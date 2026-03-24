@@ -1,21 +1,25 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 
 local buyAllRemote = ReplicatedStorage:WaitForChild("BuyAllGamePasses")
 local setMuteRequest = ReplicatedStorage:WaitForChild("SetMuteRequest")
+
+local function bumpGamePassStamp(player)
+	local stamp = player:GetAttribute("GamePassSyncStamp")
+	if type(stamp) ~= "number" then
+		stamp = 0
+	end
+	player:SetAttribute("GamePassSyncStamp", stamp + 1)
+end
 
 buyAllRemote.OnServerEvent:Connect(function(player, ids)
 	if type(ids) ~= "table" then
 		return
 	end
-	local current = player:GetAttribute("SimulatedGamePasses")
-	if type(current) ~= "table" then
-		current = {}
-	end
 	for _, id in ipairs(ids) do
-		table.insert(current, tonumber(id) or id)
+		local n = tonumber(id) or id
+		player:SetAttribute("OwnsGP_" .. tostring(n), true)
 	end
-	player:SetAttribute("SimulatedGamePasses", current)
+	bumpGamePassStamp(player)
 end)
 
 setMuteRequest.OnServerEvent:Connect(function(player, muted)

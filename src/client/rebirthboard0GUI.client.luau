@@ -81,12 +81,7 @@ if upgradePremium then
 			break
 		end
 	end
-	-- Ocultar al comprar
-	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, gamePassId, purchased)
-		if gamePassId == REBIRTHS_GAMEPASS_ID and purchased then
-			updatePremiumVisibility()
-		end
-	end)
+	player:GetAttributeChangedSignal("GamePassSyncStamp"):Connect(updatePremiumVisibility)
 	updatePremiumVisibility()
 end
 

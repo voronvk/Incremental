@@ -23,7 +23,8 @@ local function isInsideZone(part, zone)
 		math.abs(relative.Z) <= zoneSize.Z / 2
 end
 
-local CORN_GAMEPASS_ID = 1740516591
+local GamePassConfig = require(game.ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
+local CORN_GAMEPASS_ID = GamePassConfig.GOLD_CORN_GAMEPASS_ID
 local GamePassCheck = require(game.ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 local FloodCheck = require(game.ServerScriptService.Server:WaitForChild("RemoteFloodCheck") :: ModuleScript)
 
