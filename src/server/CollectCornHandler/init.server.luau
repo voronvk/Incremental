@@ -39,7 +39,6 @@ event.OnServerEvent:Connect(function(player, cornType)
 		local cornStat = currencies:FindFirstChild("Corn")
 		local rebirths = currencies:FindFirstChild("Rebirths")
 		local clicks = currencies:FindFirstChild("Clicks")
-		local totalafktime = currencies:FindFirstChild("TotalAFKTime")
 		local playtime = events and events:FindFirstChild("Playtime")
 		local collects = events:FindFirstChild("Collects")
 		local level = events:FindFirstChild("Level")
@@ -96,23 +95,13 @@ event.OnServerEvent:Connect(function(player, cornType)
 		local mult10 = ((cornenergy.Value + 1) ^ (1/5))
 		local mult11 = (tier.Value >= 1) and 2 or 1
 
-		local afkMult = 1
-		if totalafktime then
-			local afkCalc = game.ServerScriptService:FindFirstChild("Gameplay") and game.ServerScriptService.Gameplay:FindFirstChild("Modules") and game.ServerScriptService.Gameplay.Modules:FindFirstChild("AFKCalc")
-			local afkRewards = game.ReplicatedStorage:FindFirstChild("Modules") and game.ReplicatedStorage.Modules:FindFirstChild("Gameplay") and game.ReplicatedStorage.Modules.Gameplay:FindFirstChild("AFKRewards")
-			if afkCalc and afkRewards then
-				local afkMinutes = math.floor((totalafktime.Value / 60) + 0.5)
-				afkMult = require(afkCalc).CalculateGain(require(afkRewards).Melon, afkMinutes) + 1
-			end
-		end
-
 		local mult12 = GamePassCheck.playerOwnsGamePass(player, CORN_GAMEPASS_ID) and 2 or 1
 
 		local mult13 = (upgtree2_3.Value >= 1) and 5 or 1
 		local mult14 = 1.15 ^ kernel1.Value
 		local mult15 = (upgtree2_10 and upgtree2_10.Value == 1) and 5 or 1
 
-		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * afkMult * groupMulti)
+		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * groupMulti)
 
 		local character = player.Character
 		if character then

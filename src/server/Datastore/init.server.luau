@@ -10,7 +10,6 @@ local currencyStats = {
 	"Corn", "Rebirths", "Gemeralds", "Clicks", "Energy",
 	"CornLogged", "RebirthsLogged", "Ascensions", "BasicSeeds",
 	"SilverSeeds", "GoldenSeeds", "DiamondSeeds", "RubySeeds",
-	"TotalAFKTime", "CurrentAFKTime", "GemeraldAFKTime"
 }
 local upgradeStats = {
 	"SpawnRateUpg1", "CornValueUpg1", "CornAmountUpg1", "CornValueUpg2",

@@ -28,7 +28,6 @@ event.OnServerEvent:Connect(function(player, seedType)
 
 		if not (currencies and events and leaderstats) then return end
 
-		local totalafktime = currencies:FindFirstChild("TotalAFKTime")
 		local collects = events:FindFirstChild("Collects")
 		local level = events:FindFirstChild("Level")
 		local levelraw = events:FindFirstChild("LevelRaw")
@@ -41,16 +40,6 @@ event.OnServerEvent:Connect(function(player, seedType)
 			DiamondSeed = "DiamondSeeds",
 			RubySeed = "RubySeeds",
 		}
-
-		local afkMult = 1
-		if totalafktime then
-			local afkCalc = game.ServerScriptService:FindFirstChild("Gameplay") and game.ServerScriptService.Gameplay:FindFirstChild("Modules") and game.ServerScriptService.Gameplay.Modules:FindFirstChild("AFKCalc")
-			local afkRewards = game.ReplicatedStorage:FindFirstChild("Modules") and game.ReplicatedStorage.Modules:FindFirstChild("Gameplay") and game.ReplicatedStorage.Modules.Gameplay:FindFirstChild("AFKRewards")
-			if afkCalc and afkRewards then
-				local afkMinutes = math.floor((totalafktime.Value / 60) + 0.5)
-				afkMult = require(afkCalc).CalculateGain(require(afkRewards).SeedGain, afkMinutes)
-			end
-		end
 
 		local currencyName = currencyNameMap[seedType]
 		if not currencyName then return end

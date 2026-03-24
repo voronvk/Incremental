@@ -1,7 +1,22 @@
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CORN_TAG = "Corn"
-local CORN_MODEL_NAMES = { "Corn", "GoldenCorn", "SilverCorn", "RubyCorn", "DiamondCorn" }
+-- Nombres por defecto; si existe ReplicatedStorage.CornTemplates, se usan sus hijos
+local DEFAULT_NAMES = { "Corn", "GoldenCorn", "SilverCorn", "RubyCorn", "DiamondCorn" }
+local function getCornNames()
+	local folder = ReplicatedStorage:FindFirstChild("CornTemplates")
+	if folder then
+		local names = {}
+		for _, child in ipairs(folder:GetChildren()) do
+			if child:IsA("Model") or child:IsA("BasePart") then
+				table.insert(names, child.Name)
+			end
+		end
+		if #names > 0 then return names end
+	end
+	return DEFAULT_NAMES
+end
 
 local function getPosition(instance)
 	if instance:IsA("BasePart") then
@@ -28,7 +43,7 @@ local function findClosestCornInWorkspace(fromPosition, exclude)
 	local closest = nil
 	local closestDist = math.huge
 	local nameSet = {}
-	for _, name in ipairs(CORN_MODEL_NAMES) do
+	for _, name in ipairs(getCornNames()) do
 		nameSet[name] = true
 	end
 
