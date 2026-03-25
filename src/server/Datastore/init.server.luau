@@ -34,6 +34,8 @@ local upgradeStats = {
 local eventStats = {
 	"TimesRebirthed", "Island1Bought", "Playtime", "Collects",
 	"LevelRaw", "Level", "LastClaim", "Streak", "RobuxDonated",
+	-- Boosts temporales (Developer Products)
+	"MelonBoostEndTime", "RebirthBoostEndTime", "AscensionBoostEndTime", "SpeedBoostEndTime",
 	"TimesAscended", "SeedCollects", "SeedCollectsActual",
 	-- Quest system (resetea cada 24h)
 	"Quest1Type", "Quest1Target", "Quest1Progress",

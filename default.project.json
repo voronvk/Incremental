@@ -30,6 +30,16 @@
         "$ignoreUnknownInstances": true,
         "$path": "src/StarterGui/AudioGui"
       },
+      "LoadingGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/LoadingGui"
+      },
+      "Loading": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/Loading"
+      },
       "AutoHarvest": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,

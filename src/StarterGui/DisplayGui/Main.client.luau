@@ -210,7 +210,8 @@ if shop and shopData then
 end
 
 -- BoostShop: CloseButton y botones de boost (Developer Products)
-local boostShop = displayGui:FindFirstChild("BoostShop")
+-- `BoostShop` puede estar anidado (no necesariamente es hijo directo)
+local boostShop = displayGui:FindFirstChild("BoostShop", true)
 local boostShopData = frameData["BoostShop"]
 
 -- IDs de productos de boost
@@ -266,6 +267,220 @@ if boostShop and boostShopData then
 		connectButtonWithProduct(btn1h, EVERYTHING_BOOST_1HOUR_PRODUCT_ID)
 	end
 end
+
+-- BoostShop: ActiveFrame timers + multiplicadores (x2)
+task.spawn(function()
+	-- `ActiveFrame` puede estar anidado dentro de `BoostShop`
+	local boostShopActiveFrame = boostShop and boostShop:FindFirstChild("ActiveFrame", true)
+
+	local function findDescendantByNameInsensitive(root, name)
+		if not root then return nil end
+		local target = string.lower(name)
+		for _, d in ipairs(root:GetDescendants()) do
+			if string.lower(d.Name) == target then
+				return d
+			end
+		end
+		return nil
+	end
+
+	local function findDescendantByKeywords(root, keywords)
+		if not root then return nil end
+		if type(keywords) ~= "table" then return nil end
+		local lowered = {}
+		for i, k in ipairs(keywords) do
+			lowered[i] = string.lower(tostring(k))
+		end
+		for _, d in ipairs(root:GetDescendants()) do
+			local n = string.lower(d.Name)
+			local ok = true
+			for i = 1, #lowered do
+				if n:find(lowered[i], 1, true) == nil then
+					ok = false
+					break
+				end
+			end
+			if ok then
+				return d
+			end
+		end
+		return nil
+	end
+
+	if not boostShopActiveFrame then
+		-- Esperar un poco por si la UI se construye después del start
+		for _ = 1, 50 do
+			boostShopActiveFrame = boostShop and boostShop:FindFirstChild("ActiveFrame", true)
+				or findDescendantByNameInsensitive(boostShop, "ActiveFrame")
+				or findDescendantByKeywords(boostShop, { "active", "frame" })
+			if boostShopActiveFrame then break end
+			task.wait(0.1)
+		end
+	end
+	if not boostShopActiveFrame then
+		-- Debug: qué nodos contienen "active" dentro de BoostShop
+		local activeCandidates = {}
+		if boostShop then
+			for _, d in ipairs(boostShop:GetDescendants()) do
+				local n = string.lower(d.Name)
+				if n:find("active", 1, true) ~= nil then
+					table.insert(activeCandidates, d.Name)
+				end
+			end
+		end
+		table.sort(activeCandidates)
+		-- Fallback: aun si no encontramos ActiveFrame, la UI se puede actualizar buscando labels directamente dentro de BoostShop.
+		boostShopActiveFrame = boostShop
+	end
+
+	local function findDescendantByNameInsensitive(root, name)
+		if not root then return nil end
+		local target = string.lower(name)
+		for _, d in ipairs(root:GetDescendants()) do
+			if string.lower(d.Name) == target then
+				return d
+			end
+		end
+		return nil
+	end
+
+	local function findDescendantByKeywords(root, keywords)
+		if not root then return nil end
+		if type(keywords) ~= "table" then return nil end
+		local lowered = {}
+		for i, k in ipairs(keywords) do
+			lowered[i] = string.lower(tostring(k))
+		end
+		for _, d in ipairs(root:GetDescendants()) do
+			local n = string.lower(d.Name)
+			local ok = true
+			for i = 1, #lowered do
+				if n:find(lowered[i], 1, true) == nil then
+					ok = false
+					break
+				end
+			end
+			if ok then
+				return d
+			end
+		end
+		return nil
+	end
+
+	local function getTextLabel(nodeOrMaybeFrame, fallbackName)
+		if nodeOrMaybeFrame and nodeOrMaybeFrame:IsA("TextLabel") then
+			return nodeOrMaybeFrame
+		end
+		-- If we were given a frame/container, take its first TextLabel.
+		if nodeOrMaybeFrame then
+			local t = nodeOrMaybeFrame:FindFirstChildWhichIsA("TextLabel", true)
+			if t then return t end
+		end
+		-- If nothing found, try to find a descendant named fallbackName.
+		if fallbackName and boostShopActiveFrame then
+			local byName = findDescendantByNameInsensitive(boostShopActiveFrame, fallbackName)
+			if byName and byName:IsA("TextLabel") then
+				return byName
+			end
+			if byName then
+				return byName:FindFirstChildWhichIsA("TextLabel", true)
+			end
+		end
+		return nil
+	end
+
+	local function formatTime(totalSeconds)
+		totalSeconds = math.max(0, math.floor(totalSeconds))
+		if totalSeconds >= 3600 then
+			local h = math.floor(totalSeconds / 3600)
+			local m = math.floor((totalSeconds % 3600) / 60)
+			local s = totalSeconds % 60
+			return string.format("%d:%02d:%02d", h, m, s)
+		else
+			local m = math.floor(totalSeconds / 60)
+			local s = totalSeconds % 60
+			return string.format("%d:%02d", m, s)
+		end
+	end
+
+	local events = player:WaitForChild("Events")
+
+	-- Lookups toleran mayus/minusculas y sufijos/prefixes.
+	local melonTimerNode = findDescendantByKeywords(boostShopActiveFrame, { "melon", "timer" })
+	local melonBoostNode = findDescendantByKeywords(boostShopActiveFrame, { "melon", "boost" })
+	local speedTimerNode = findDescendantByKeywords(boostShopActiveFrame, { "speed", "timer" })
+	local speedBoostNode = findDescendantByKeywords(boostShopActiveFrame, { "speed", "boost" })
+	local rebirthTimerNode = findDescendantByKeywords(boostShopActiveFrame, { "rebirth", "timer" })
+	local rebirthBoostNode = findDescendantByKeywords(boostShopActiveFrame, { "rebirth", "boost" })
+	local ascensionTimerNode = findDescendantByKeywords(boostShopActiveFrame, { "ascension", "timer" })
+	local ascensionBoostNode = findDescendantByKeywords(boostShopActiveFrame, { "ascension", "boost" })
+
+	local melonTimerLabel
+	local melonBoostLabel
+	local speedTimerLabel
+	local speedBoostLabel
+	local rebirthTimerLabel
+	local rebirthBoostLabel
+	local ascensionTimerLabel
+	local ascensionBoostLabel
+
+	local function refreshLabels()
+		-- Re-resolver por si los labels se crean después de abrir la UI.
+		local melonTimerNow = findDescendantByNameInsensitive(boostShopActiveFrame, "MelonTimer")
+		local melonBoostNow = findDescendantByNameInsensitive(boostShopActiveFrame, "MelonBoost")
+		local speedTimerNow = findDescendantByNameInsensitive(boostShopActiveFrame, "SpeedTimer")
+		local speedBoostNow = findDescendantByNameInsensitive(boostShopActiveFrame, "SpeedBoost")
+		local rebirthTimerNow = findDescendantByNameInsensitive(boostShopActiveFrame, "RebirthTimer")
+		local rebirthBoostNow = findDescendantByNameInsensitive(boostShopActiveFrame, "RebirthBoost")
+		local ascensionTimerNow = findDescendantByNameInsensitive(boostShopActiveFrame, "AscensionTimer")
+		local ascensionBoostNow = findDescendantByNameInsensitive(boostShopActiveFrame, "AscensionBoost")
+
+		melonTimerLabel = getTextLabel(melonTimerNow)
+		melonBoostLabel = getTextLabel(melonBoostNow)
+		speedTimerLabel = getTextLabel(speedTimerNow)
+		speedBoostLabel = getTextLabel(speedBoostNow)
+		rebirthTimerLabel = getTextLabel(rebirthTimerNow)
+		rebirthBoostLabel = getTextLabel(rebirthBoostNow)
+		ascensionTimerLabel = getTextLabel(ascensionTimerNow)
+		ascensionBoostLabel = getTextLabel(ascensionBoostNow)
+	end
+
+	refreshLabels()
+
+	local function setBoost(timerLabel, boostLabel, endTimeValue)
+		-- Permite que falte uno de los dos (timer o boost label).
+		if not (timerLabel or boostLabel) then return end
+		local now = os.time()
+		local remaining = 0
+		local active = false
+		if endTimeValue and type(endTimeValue.Value) == "number" then
+			remaining = endTimeValue.Value - now
+			active = remaining > 0
+		end
+
+		if timerLabel then
+			-- Nunca mostrar "0". Cuando expira: "0:00".
+			timerLabel.Text = active and formatTime(remaining) or "0:00"
+		end
+		if boostLabel then
+			-- Nunca mostrar "0". Cuando expira: "x0".
+			boostLabel.Text = active and "x2" or "x0"
+		end
+	end
+
+	while player.Parent do
+		-- Si alguno de los labels aún es nil, re-resolver.
+		if not (melonTimerLabel and melonBoostLabel and speedTimerLabel and speedBoostLabel and rebirthTimerLabel and rebirthBoostLabel and ascensionTimerLabel and ascensionBoostLabel) then
+			refreshLabels()
+		end
+
+		setBoost(melonTimerLabel, melonBoostLabel, events:FindFirstChild("MelonBoostEndTime"))
+		setBoost(speedTimerLabel, speedBoostLabel, events:FindFirstChild("SpeedBoostEndTime"))
+		setBoost(rebirthTimerLabel, rebirthBoostLabel, events:FindFirstChild("RebirthBoostEndTime"))
+		setBoost(ascensionTimerLabel, ascensionBoostLabel, events:FindFirstChild("AscensionBoostEndTime"))
+		task.wait(1)
+	end
+end)
 
 -- QuestFrame: CloseButton y sistema de misiones (Quest1, Quest2, Quest3)
 local questFrame = displayGui:FindFirstChild("QuestFrame")

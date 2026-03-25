@@ -12,3 +12,7 @@ local function cloneChildrenOfFolder(folderName)
 end
 
 cloneChildrenOfFolder("CloneFolder")
+
+-- Helper: restaura la posición base (desde ReplicatedStorage) y oculta
+-- cuando `Unlocks` manda objetos "muy abajo".
+require(ReplicatedStorage.Shared:WaitForChild("AutoPlacementHideHelper")).start()

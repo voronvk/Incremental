@@ -101,8 +101,13 @@ event.OnServerEvent:Connect(function(player, cornType)
 		local mult13 = (upgtree2_3.Value >= 1) and 5 or 1
 		local mult14 = 1.15 ^ kernel1.Value
 		local mult15 = (upgtree2_10 and upgtree2_10.Value == 1) and 5 or 1
+		local melonBoostMult = 1
+		local melonEnd = events and events:FindFirstChild("MelonBoostEndTime")
+		if melonEnd and melonEnd.Value > os.time() then
+			melonBoostMult = 2
+		end
 
-		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * groupMulti)
+		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * groupMulti * melonBoostMult)
 
 		local character = player.Character
 		if character then
@@ -202,8 +207,13 @@ autoevent.OnServerEvent:Connect(function(player, cornType)
 		local mult13 = (upgtree2_3.Value >= 1) and 5 or 1
 		local mult14 = 1.15 ^ kernel1.Value
 		local mult15 = (upgtree2_10 and upgtree2_10.Value == 1) and 5 or 1
+		local melonBoostMult = 1
+		local melonEnd = events and events:FindFirstChild("MelonBoostEndTime")
+		if melonEnd and melonEnd.Value > os.time() then
+			melonBoostMult = 2
+		end
 
-		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15)
+		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * melonBoostMult)
 
 		cornStat.Value += totalValue
 		collects.Value += 1

@@ -64,7 +64,13 @@ upgradeEvent.OnServerEvent:Connect(function(player)
 
 		local mult3 = GamePassCheck.playerOwnsGamePass(player, ASCENSION_GAMEPASS_ID) and 2 or 1
 
-		ascensions.Value += math.floor(1 * mult * mult2 * mult3)
+	local ascensionBoostMult = 1
+	local ascEnd = events and events:FindFirstChild("AscensionBoostEndTime")
+	if ascEnd and ascEnd.Value > os.time() then
+		ascensionBoostMult = 2
+	end
+
+	ascensions.Value += math.floor(1 * mult * mult2 * mult3 * ascensionBoostMult)
 		if timesascended then
 			timesascended.Value += 1
 		end

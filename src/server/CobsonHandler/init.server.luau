@@ -8,6 +8,30 @@ local QUICKSHOP_LUCK_PRODUCT_ID = 3553201276
 local LUCK_BOOST_DURATION = 120 -- segundos
 local LUCK_BOOST_PER_STACK = 3 -- +300% = 4x por stack (1 + 3)
 
+-- BoostShop (Developer Products)
+local MELON_BOOST_15MIN_PRODUCT_ID = 3560570963
+local MELON_BOOST_1HOUR_PRODUCT_ID = 3560571041
+local EVERYTHING_BOOST_15MIN_PRODUCT_ID = 3560571168
+local EVERYTHING_BOOST_1HOUR_PRODUCT_ID = 3560571293
+
+local MELON_BOOST_DURATION_15MIN = 15 * 60
+local MELON_BOOST_DURATION_1HOUR = 60 * 60
+
+local function extendBoostEndTime(numberValue, durationSeconds)
+	if not numberValue then return end
+	local now = os.time()
+	local current = numberValue.Value
+	if type(current) ~= "number" then
+		current = 0
+	end
+	if current < now then
+		numberValue.Value = now + durationSeconds
+	else
+		-- Extend if already active (sumar duración)
+		numberValue.Value = current + durationSeconds
+	end
+end
+
 -- Gemerald product IDs
 local GEM_PRODUCT_ID_1 = 3461625487
 local GEM_PRODUCT_ID_2 = 3461625810
@@ -112,10 +136,40 @@ local function safelyGetCorn(player)
 	return nil
 end
 
+local function safelyGetBoostEndTime(player, valueName)
+	local events = player:FindFirstChild("Events")
+	if not events then
+		events = Instance.new("Folder")
+		events.Name = "Events"
+		events.Parent = player
+	end
+
+	local v = events:FindFirstChild(valueName)
+	if v and v:IsA("NumberValue") then
+		return v
+	end
+
+	-- Espera corta por si DataStore ya lo creó pero justo después
+	for _ = 1, 10 do
+		local candidate = events:FindFirstChild(valueName)
+		if candidate and candidate:IsA("NumberValue") then
+			return candidate
+		end
+		task.wait(0.1)
+	end
+
+	-- Fallback: crear para no perder la compra
+	v = Instance.new("NumberValue")
+	v.Name = valueName
+	v.Value = 0
+	v.Parent = events
+	return v
+end
+
 local function processReceipt(receiptInfo)
-	local userId = receiptInfo.PlayerId
+	local userId = tonumber(receiptInfo.PlayerId) or receiptInfo.PlayerId
 	local purchaseId = receiptInfo.PurchaseId
-	local productId = receiptInfo.ProductId
+	local productId = tonumber(receiptInfo.ProductId)
 
 	local success, alreadyProcessed = pcall(function()
 		return receiptDataStore:GetAsync(purchaseId)
@@ -154,6 +208,54 @@ local function processReceipt(receiptInfo)
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
 		corn.Value += cornProductValues[productId].amount
+
+	elseif productId == MELON_BOOST_15MIN_PRODUCT_ID then
+		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")
+		if not melonEnd then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		extendBoostEndTime(melonEnd, MELON_BOOST_DURATION_15MIN)
+		player:SetAttribute("LastBoostProduct", tostring(productId))
+		player:SetAttribute("LastMelonBoostEnd", melonEnd.Value)
+
+	elseif productId == MELON_BOOST_1HOUR_PRODUCT_ID then
+		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")
+		if not melonEnd then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		extendBoostEndTime(melonEnd, MELON_BOOST_DURATION_1HOUR)
+		player:SetAttribute("LastBoostProduct", tostring(productId))
+		player:SetAttribute("LastMelonBoostEnd", melonEnd.Value)
+
+	elseif productId == EVERYTHING_BOOST_15MIN_PRODUCT_ID then
+		local speedEnd = safelyGetBoostEndTime(player, "SpeedBoostEndTime")
+		local rebirthEnd = safelyGetBoostEndTime(player, "RebirthBoostEndTime")
+		local ascEnd = safelyGetBoostEndTime(player, "AscensionBoostEndTime")
+		if not (speedEnd and rebirthEnd and ascEnd) then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		extendBoostEndTime(speedEnd, MELON_BOOST_DURATION_15MIN)
+		extendBoostEndTime(rebirthEnd, MELON_BOOST_DURATION_15MIN)
+		extendBoostEndTime(ascEnd, MELON_BOOST_DURATION_15MIN)
+		player:SetAttribute("LastBoostProduct", tostring(productId))
+		player:SetAttribute("LastSpeedBoostEnd", speedEnd.Value)
+		player:SetAttribute("LastRebirthBoostEnd", rebirthEnd.Value)
+		player:SetAttribute("LastAscensionBoostEnd", ascEnd.Value)
+
+	elseif productId == EVERYTHING_BOOST_1HOUR_PRODUCT_ID then
+		local speedEnd = safelyGetBoostEndTime(player, "SpeedBoostEndTime")
+		local rebirthEnd = safelyGetBoostEndTime(player, "RebirthBoostEndTime")
+		local ascEnd = safelyGetBoostEndTime(player, "AscensionBoostEndTime")
+		if not (speedEnd and rebirthEnd and ascEnd) then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		extendBoostEndTime(speedEnd, MELON_BOOST_DURATION_1HOUR)
+		extendBoostEndTime(rebirthEnd, MELON_BOOST_DURATION_1HOUR)
+		extendBoostEndTime(ascEnd, MELON_BOOST_DURATION_1HOUR)
+		player:SetAttribute("LastBoostProduct", tostring(productId))
+		player:SetAttribute("LastSpeedBoostEnd", speedEnd.Value)
+		player:SetAttribute("LastRebirthBoostEnd", rebirthEnd.Value)
+		player:SetAttribute("LastAscensionBoostEnd", ascEnd.Value)
 
 	elseif productId == QUICKSHOP_LUCK_PRODUCT_ID then
 		local endTimes = player:GetAttribute("LuckBoostEndTimes")

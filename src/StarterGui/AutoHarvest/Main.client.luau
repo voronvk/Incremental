@@ -19,6 +19,9 @@ local STUCK_TIME = 0.4
 local AUTO_BLOCK_ACTION = "AutoHarvestBlockMovement"
 local GROUP_ID = 442873166
 local GOLD_GAMEPASS_ID = 1740516591
+local WALK_SPEED_MULTIPLIER_GOLD = 2
+local events = player:WaitForChild("Events")
+local speedBoostEndTime = events:WaitForChild("SpeedBoostEndTime")
 
 local COLOR_IMAGE_ON = Color3.fromRGB(255, 255, 255)
 local COLOR_IMAGE_OFF = Color3.fromRGB(127, 127, 127)
@@ -35,6 +38,9 @@ local WARN_ANIM_DURATION = 0.3
 
 if player:GetAttribute("Auto") == nil then
 	player:SetAttribute("Auto", false)
+end
+if player:GetAttribute("AutoGold") == nil then
+	player:SetAttribute("AutoGold", false)
 end
 
 local container = script.Parent
@@ -179,12 +185,14 @@ local function updateButtonColor()
 	local canUseBasic = GROUP_ID <= 0 or player:IsInGroup(GROUP_ID)
 	local canUseGold = hasGoldPass
 	local isAuto = player:GetAttribute("Auto") == true
+	local isAutoGold = player:GetAttribute("AutoGold") == true
 
 	if basicButton then
 		basicButton.ImageColor3 = (canUseBasic and isAuto) and COLOR_IMAGE_ON or COLOR_IMAGE_OFF
 	end
 	if basicLabel then
 		basicLabel.TextColor3 = (canUseBasic and isAuto) and COLOR_LABEL_ON or COLOR_LABEL_OFF
+		basicLabel.Text = (isAuto and not isAutoGold) and "On" or "Off"
 	end
 
 	if goldButton then
@@ -192,6 +200,30 @@ local function updateButtonColor()
 	end
 	if goldLabel then
 		goldLabel.TextColor3 = (canUseGold and isAuto) and COLOR_LABEL_ON or COLOR_LABEL_OFF
+		goldLabel.Text = (isAuto and isAutoGold) and "On" or "Off"
+	end
+end
+
+local function tryRefreshGoldUnlockHide(timeoutSeconds: number)
+	-- A veces el atributo del gamepass tarda en replicar; hacemos un "poll"
+	-- corto para que el frame Unlock desaparezca lo antes posible.
+	local start = tick()
+	while tick() - start < timeoutSeconds do
+		refreshGoldPassState()
+		updateButtonColor()
+		if hasGoldPass then
+			if goldUnlock and goldUnlock:IsA("GuiObject") then
+				goldUnlock.Visible = false
+			end
+			return
+		end
+		task.wait(1)
+	end
+	-- Última comprobación por si ya replicó al salir del timeout.
+	refreshGoldPassState()
+	updateButtonColor()
+	if goldUnlock and goldUnlock:IsA("GuiObject") then
+		goldUnlock.Visible = not hasGoldPass
 	end
 end
 
@@ -223,12 +255,55 @@ player:GetAttributeChangedSignal("Auto"):Connect(function()
 end)
 
 local activeConnection = nil
+local savedWalkSpeed: number? = nil
+local savedWalkSpeedHumanoid: Humanoid? = nil
 
 local function stopAutoHarvest()
 	if activeConnection then
 		activeConnection:Disconnect()
 		activeConnection = nil
 	end
+
+	-- Restore WalkSpeed after disabling auto (or switching away from Gold).
+	if savedWalkSpeedHumanoid and savedWalkSpeed ~= nil then
+		pcall(function()
+			local speedBoostMultNow = (speedBoostEndTime.Value > os.time()) and 2 or 1
+			savedWalkSpeedHumanoid.WalkSpeed = (savedWalkSpeed :: number) * speedBoostMultNow
+		end)
+	end
+	savedWalkSpeed = nil
+	savedWalkSpeedHumanoid = nil
+end
+
+local function refreshGoldWalkSpeed(humanoid: Humanoid?)
+	if not humanoid then
+		return
+	end
+
+	-- If we're not in Gold mode, restore and clear.
+	if player:GetAttribute("AutoGold") ~= true then
+		if savedWalkSpeedHumanoid == humanoid and savedWalkSpeed ~= nil then
+			pcall(function()
+				local speedBoostMultNow = (speedBoostEndTime.Value > os.time()) and 2 or 1
+				humanoid.WalkSpeed = (savedWalkSpeed :: number) * speedBoostMultNow
+			end)
+		end
+		savedWalkSpeed = nil
+		savedWalkSpeedHumanoid = nil
+		return
+	end
+
+	-- In Gold mode, capture base WalkSpeed once per humanoid and apply x2.
+	if savedWalkSpeed == nil or savedWalkSpeedHumanoid ~= humanoid then
+		savedWalkSpeedHumanoid = humanoid
+		-- Guardamos la velocidad base SIN boost temporal de speed.
+		-- Luego, en cada tick, volvemos a aplicar el multiplicador actual (1 o 2).
+		local speedBoostMultAtCapture = (speedBoostEndTime.Value > os.time()) and 2 or 1
+		savedWalkSpeed = (speedBoostMultAtCapture == 2) and (humanoid.WalkSpeed / 2) or humanoid.WalkSpeed
+	end
+
+	local speedBoostMultNow = (speedBoostEndTime.Value > os.time()) and 2 or 1
+	humanoid.WalkSpeed = (savedWalkSpeed :: number) * speedBoostMultNow * WALK_SPEED_MULTIPLIER_GOLD
 end
 
 local function isTargetValid(target)
@@ -264,6 +339,9 @@ local function startAutoHarvest()
 			if not humanoid or not rootPart or humanoid.Health <= 0 then
 				return
 			end
+
+			-- Apply Gold speed bonus while autoharvesting.
+			refreshGoldWalkSpeed(humanoid)
 
 			if not CornFinder then
 				return
@@ -317,6 +395,27 @@ player:GetAttributeChangedSignal("Auto"):Connect(function()
 		task.defer(startAutoHarvest)
 	else
 		stopAutoHarvest()
+	end
+end)
+
+player:GetAttributeChangedSignal("AutoGold"):Connect(function()
+	-- If Auto is currently running, adjust speed immediately when toggling Gold mode.
+	if player:GetAttribute("Auto") == true then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChild("Humanoid") :: Humanoid?
+		refreshGoldWalkSpeed(humanoid)
+		updateButtonColor()
+	else
+		-- Ensure we don't leave any modified speed behind.
+		if savedWalkSpeedHumanoid and savedWalkSpeed ~= nil then
+			pcall(function()
+				local speedBoostMultNow = (speedBoostEndTime.Value > os.time()) and 2 or 1
+				savedWalkSpeedHumanoid.WalkSpeed = (savedWalkSpeed :: number) * speedBoostMultNow
+			end)
+		end
+		savedWalkSpeed = nil
+		savedWalkSpeedHumanoid = nil
+		updateButtonColor()
 	end
 end)
 
@@ -409,8 +508,9 @@ local function bindFrameButton(button, state, onClick)
 	button.MouseButton1Click:Connect(onClick)
 end
 
-local function toggleAuto()
-	player:SetAttribute("Auto", not player:GetAttribute("Auto"))
+local function setAutoMode(isAuto: boolean, isGold: boolean)
+	player:SetAttribute("Auto", isAuto)
+	player:SetAttribute("AutoGold", isGold)
 end
 
 bindFrameButton(basicButton, basicState, function()
@@ -418,15 +518,26 @@ bindFrameButton(basicButton, basicState, function()
 		playWarn()
 		return
 	end
-	toggleAuto()
+	if player:GetAttribute("Auto") == true then
+		setAutoMode(false, false)
+	else
+		setAutoMode(true, false)
+	end
 end)
 
 bindFrameButton(goldButton, goldState, function()
 	if not hasGoldPass then
 		MarketplaceService:PromptGamePassPurchase(player, GOLD_GAMEPASS_ID)
+		task.spawn(function()
+			tryRefreshGoldUnlockHide(15)
+		end)
 		return
 	end
-	toggleAuto()
+	if player:GetAttribute("Auto") == true then
+		setAutoMode(false, false)
+	else
+		setAutoMode(true, true)
+	end
 end)
 
 if goldUnlock and goldUnlock:IsA("GuiObject") then

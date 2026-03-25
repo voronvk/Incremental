@@ -9,6 +9,8 @@ local upgrades = player:WaitForChild("Upgrades")
 local upgTree4 = upgrades:WaitForChild("UpgTree4")
 local upgtree2_28 = upgrades:WaitForChild("UpgTree2_28")
 local upgtree2_29 = upgrades:WaitForChild("UpgTree2_29")
+local events = player:WaitForChild("Events")
+local speedBoostEndTime = events:WaitForChild("SpeedBoostEndTime")
 local defaultspeed = 16
 
 local function checkGamepass()
@@ -39,6 +41,9 @@ local function applyWalkspeedBonus()
 		speed = speed * 1.75
 	end
 
+	local speedBoostMult = (speedBoostEndTime.Value > os.time()) and 2 or 1
+	speed = speed * speedBoostMult
+
 	humanoid.WalkSpeed = speed
 end
 
@@ -61,3 +66,4 @@ end)
 upgTree4:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
 upgtree2_28:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
 upgtree2_29:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
+speedBoostEndTime:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)

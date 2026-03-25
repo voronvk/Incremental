@@ -59,9 +59,14 @@ rebirthEvent.OnServerEvent:Connect(function(player)
 
 	local mult10 = (upgtree2_3.Value == 1) and 0.1 or 1
 	local mult11 = (upgtree2_10.Value == 1) and 0.25 or 1
+	local rebirthBoostMult = 1
+	local rebirthEnd = events and events:FindFirstChild("RebirthBoostEndTime")
+	if rebirthEnd and rebirthEnd.Value > os.time() then
+		rebirthBoostMult = 2
+	end
 
 	if corn.Value >= cost then
-		local gain = (math.floor(corn.Value / BASE_COST) * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * groupMulti)
+		local gain = (math.floor(corn.Value / BASE_COST) * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * groupMulti * rebirthBoostMult)
 
 		rebirths.Value += math.floor(gain + 0.5)
 		timesRebirthed.Value = timesRebirthed.Value + 1
@@ -106,6 +111,11 @@ task.spawn(function()
 					if tier.Value >= 4 then
 
 						local cost = BASE_COST
+						local rebirthBoostMult = 1
+						local rebirthEnd = events and events:FindFirstChild("RebirthBoostEndTime")
+						if rebirthEnd and rebirthEnd.Value > os.time() then
+							rebirthBoostMult = 2
+						end
 
 						local mult1 = 2 ^ rebirthValue.Value
 						local mult2 = (upgtree1.Value == 1) and 2 or 1
@@ -142,6 +152,7 @@ task.spawn(function()
 							gain *= mult9
 							gain *= mult10
 							gain *= mult11
+							gain *= rebirthBoostMult
 
 							gain /= autogain
 
