@@ -103,8 +103,9 @@ event.OnServerEvent:Connect(function(player, cornType)
 		local mult15 = (upgtree2_10 and upgtree2_10.Value == 1) and 5 or 1
 		local melonBoostMult = 1
 		local melonEnd = events and events:FindFirstChild("MelonBoostEndTime")
-		if melonEnd and melonEnd.Value > os.time() then
-			melonBoostMult = 2
+		local melonBoostMultiplier = events and events:FindFirstChild("MelonBoostMultiplier")
+		if melonEnd and melonBoostMultiplier and melonEnd.Value > os.time() then
+			melonBoostMult = math.max(1, melonBoostMultiplier.Value)
 		end
 
 		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * groupMulti * melonBoostMult)
@@ -209,8 +210,9 @@ autoevent.OnServerEvent:Connect(function(player, cornType)
 		local mult15 = (upgtree2_10 and upgtree2_10.Value == 1) and 5 or 1
 		local melonBoostMult = 1
 		local melonEnd = events and events:FindFirstChild("MelonBoostEndTime")
-		if melonEnd and melonEnd.Value > os.time() then
-			melonBoostMult = 2
+		local melonBoostMultiplier = events and events:FindFirstChild("MelonBoostMultiplier")
+		if melonEnd and melonBoostMultiplier and melonEnd.Value > os.time() then
+			melonBoostMult = math.max(1, melonBoostMultiplier.Value)
 		end
 
 		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * melonBoostMult)

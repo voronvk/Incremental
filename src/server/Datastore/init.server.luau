@@ -36,12 +36,14 @@ local eventStats = {
 	"LevelRaw", "Level", "LastClaim", "Streak", "RobuxDonated",
 	-- Boosts temporales (Developer Products)
 	"MelonBoostEndTime", "RebirthBoostEndTime", "AscensionBoostEndTime", "SpeedBoostEndTime",
+	"MelonBoostMultiplier", "RebirthBoostMultiplier", "AscensionBoostMultiplier", "SpeedBoostMultiplier",
 	"TimesAscended", "SeedCollects", "SeedCollectsActual",
 	-- Quest system (resetea cada 24h)
 	"Quest1Type", "Quest1Target", "Quest1Progress",
 	"Quest2Type", "Quest2Target", "Quest2Progress",
 	"Quest3Type", "Quest3Target", "Quest3Progress",
 	"QuestLastResetTime", "QuestPlaytimeAtReset", "QuestRebirthsAtReset", "QuestMelonsCollected",
+	"QuestRewardClaimed",
 }
 
 local settingsStats = {

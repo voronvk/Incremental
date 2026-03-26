@@ -13,6 +13,7 @@ local MELON_BOOST_15MIN_PRODUCT_ID = 3560570963
 local MELON_BOOST_1HOUR_PRODUCT_ID = 3560571041
 local EVERYTHING_BOOST_15MIN_PRODUCT_ID = 3560571168
 local EVERYTHING_BOOST_1HOUR_PRODUCT_ID = 3560571293
+local DOUBLE_QUEST_REWARD_PRODUCT_ID = 3563363605
 
 local MELON_BOOST_DURATION_15MIN = 15 * 60
 local MELON_BOOST_DURATION_1HOUR = 60 * 60
@@ -166,6 +167,79 @@ local function safelyGetBoostEndTime(player, valueName)
 	return v
 end
 
+local function safelyGetBoostMultiplier(player, valueName)
+	local events = player:FindFirstChild("Events")
+	if not events then
+		events = Instance.new("Folder")
+		events.Name = "Events"
+		events.Parent = player
+	end
+
+	local v = events:FindFirstChild(valueName)
+	if v and v:IsA("NumberValue") then
+		return v
+	end
+
+	for _ = 1, 10 do
+		local candidate = events:FindFirstChild(valueName)
+		if candidate and candidate:IsA("NumberValue") then
+			return candidate
+		end
+		task.wait(0.1)
+	end
+
+	v = Instance.new("NumberValue")
+	v.Name = valueName
+	v.Value = 2
+	v.Parent = events
+	return v
+end
+
+local function setBoostMultiplierIfInactive(endTimeValue: NumberValue?, multiplierValue: NumberValue?, newMultiplier: number)
+	if not (endTimeValue and multiplierValue) then return end
+	local now = os.time()
+	if endTimeValue.Value <= now then
+		multiplierValue.Value = newMultiplier
+	end
+end
+
+local function grantQuestRewardBoost(player, timeMultiplier: number)
+	local events = player:FindFirstChild("Events")
+	if not events then return false end
+
+	local function isQuestDone(i: number)
+		local t = events:FindFirstChild("Quest" .. i .. "Target")
+		local p = events:FindFirstChild("Quest" .. i .. "Progress")
+		return t and p and p.Value >= t.Value
+	end
+
+	local claimed = events:FindFirstChild("QuestRewardClaimed")
+	if not claimed or claimed.Value ~= 0 then
+		return false
+	end
+
+	if not (isQuestDone(1) and isQuestDone(2) and isQuestDone(3)) then
+		return false
+	end
+
+	local boostKeys = { "Melon", "Speed", "Rebirth", "Ascension" }
+	local chosen = boostKeys[math.random(1, #boostKeys)]
+
+	local durationMinutes = math.random(15, 30) * math.max(1, (tonumber(timeMultiplier) or 1))
+	local durationSeconds = durationMinutes * 60
+	local mult = 1.5 + (math.random() * (3 - 1.5))
+	-- Redondear a 2 decimales para que el texto se vea estable
+	mult = math.floor(mult * 100 + 0.5) / 100
+
+	local endTime = safelyGetBoostEndTime(player, chosen .. "BoostEndTime")
+	local multiplier = safelyGetBoostMultiplier(player, chosen .. "BoostMultiplier")
+	setBoostMultiplierIfInactive(endTime, multiplier, mult)
+	extendBoostEndTime(endTime, durationSeconds)
+
+	claimed.Value = 1
+	return true
+end
+
 local function processReceipt(receiptInfo)
 	local userId = tonumber(receiptInfo.PlayerId) or receiptInfo.PlayerId
 	local purchaseId = receiptInfo.PurchaseId
@@ -211,18 +285,22 @@ local function processReceipt(receiptInfo)
 
 	elseif productId == MELON_BOOST_15MIN_PRODUCT_ID then
 		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")
+		local melonMult = safelyGetBoostMultiplier(player, "MelonBoostMultiplier")
 		if not melonEnd then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+		setBoostMultiplierIfInactive(melonEnd, melonMult, 2)
 		extendBoostEndTime(melonEnd, MELON_BOOST_DURATION_15MIN)
 		player:SetAttribute("LastBoostProduct", tostring(productId))
 		player:SetAttribute("LastMelonBoostEnd", melonEnd.Value)
 
 	elseif productId == MELON_BOOST_1HOUR_PRODUCT_ID then
 		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")
+		local melonMult = safelyGetBoostMultiplier(player, "MelonBoostMultiplier")
 		if not melonEnd then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+		setBoostMultiplierIfInactive(melonEnd, melonMult, 2)
 		extendBoostEndTime(melonEnd, MELON_BOOST_DURATION_1HOUR)
 		player:SetAttribute("LastBoostProduct", tostring(productId))
 		player:SetAttribute("LastMelonBoostEnd", melonEnd.Value)
@@ -231,9 +309,15 @@ local function processReceipt(receiptInfo)
 		local speedEnd = safelyGetBoostEndTime(player, "SpeedBoostEndTime")
 		local rebirthEnd = safelyGetBoostEndTime(player, "RebirthBoostEndTime")
 		local ascEnd = safelyGetBoostEndTime(player, "AscensionBoostEndTime")
+		local speedMult = safelyGetBoostMultiplier(player, "SpeedBoostMultiplier")
+		local rebirthMult = safelyGetBoostMultiplier(player, "RebirthBoostMultiplier")
+		local ascMult = safelyGetBoostMultiplier(player, "AscensionBoostMultiplier")
 		if not (speedEnd and rebirthEnd and ascEnd) then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+		setBoostMultiplierIfInactive(speedEnd, speedMult, 2)
+		setBoostMultiplierIfInactive(rebirthEnd, rebirthMult, 2)
+		setBoostMultiplierIfInactive(ascEnd, ascMult, 2)
 		extendBoostEndTime(speedEnd, MELON_BOOST_DURATION_15MIN)
 		extendBoostEndTime(rebirthEnd, MELON_BOOST_DURATION_15MIN)
 		extendBoostEndTime(ascEnd, MELON_BOOST_DURATION_15MIN)
@@ -246,9 +330,15 @@ local function processReceipt(receiptInfo)
 		local speedEnd = safelyGetBoostEndTime(player, "SpeedBoostEndTime")
 		local rebirthEnd = safelyGetBoostEndTime(player, "RebirthBoostEndTime")
 		local ascEnd = safelyGetBoostEndTime(player, "AscensionBoostEndTime")
+		local speedMult = safelyGetBoostMultiplier(player, "SpeedBoostMultiplier")
+		local rebirthMult = safelyGetBoostMultiplier(player, "RebirthBoostMultiplier")
+		local ascMult = safelyGetBoostMultiplier(player, "AscensionBoostMultiplier")
 		if not (speedEnd and rebirthEnd and ascEnd) then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+		setBoostMultiplierIfInactive(speedEnd, speedMult, 2)
+		setBoostMultiplierIfInactive(rebirthEnd, rebirthMult, 2)
+		setBoostMultiplierIfInactive(ascEnd, ascMult, 2)
 		extendBoostEndTime(speedEnd, MELON_BOOST_DURATION_1HOUR)
 		extendBoostEndTime(rebirthEnd, MELON_BOOST_DURATION_1HOUR)
 		extendBoostEndTime(ascEnd, MELON_BOOST_DURATION_1HOUR)
@@ -256,6 +346,12 @@ local function processReceipt(receiptInfo)
 		player:SetAttribute("LastSpeedBoostEnd", speedEnd.Value)
 		player:SetAttribute("LastRebirthBoostEnd", rebirthEnd.Value)
 		player:SetAttribute("LastAscensionBoostEnd", ascEnd.Value)
+
+	elseif productId == DOUBLE_QUEST_REWARD_PRODUCT_ID then
+		local ok = grantQuestRewardBoost(player, 2)
+		if not ok then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
 
 	elseif productId == QUICKSHOP_LUCK_PRODUCT_ID then
 		local endTimes = player:GetAttribute("LuckBoostEndTimes")

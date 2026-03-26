@@ -66,8 +66,9 @@ upgradeEvent.OnServerEvent:Connect(function(player)
 
 	local ascensionBoostMult = 1
 	local ascEnd = events and events:FindFirstChild("AscensionBoostEndTime")
-	if ascEnd and ascEnd.Value > os.time() then
-		ascensionBoostMult = 2
+	local ascBoostMultiplier = events and events:FindFirstChild("AscensionBoostMultiplier")
+	if ascEnd and ascBoostMultiplier and ascEnd.Value > os.time() then
+		ascensionBoostMult = math.max(1, ascBoostMultiplier.Value)
 	end
 
 	ascensions.Value += math.floor(1 * mult * mult2 * mult3 * ascensionBoostMult)

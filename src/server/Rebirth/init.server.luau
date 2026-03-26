@@ -61,8 +61,9 @@ rebirthEvent.OnServerEvent:Connect(function(player)
 	local mult11 = (upgtree2_10.Value == 1) and 0.25 or 1
 	local rebirthBoostMult = 1
 	local rebirthEnd = events and events:FindFirstChild("RebirthBoostEndTime")
-	if rebirthEnd and rebirthEnd.Value > os.time() then
-		rebirthBoostMult = 2
+	local rebirthBoostMultiplier = events and events:FindFirstChild("RebirthBoostMultiplier")
+	if rebirthEnd and rebirthBoostMultiplier and rebirthEnd.Value > os.time() then
+		rebirthBoostMult = math.max(1, rebirthBoostMultiplier.Value)
 	end
 
 	if corn.Value >= cost then
@@ -113,8 +114,9 @@ task.spawn(function()
 						local cost = BASE_COST
 						local rebirthBoostMult = 1
 						local rebirthEnd = events and events:FindFirstChild("RebirthBoostEndTime")
-						if rebirthEnd and rebirthEnd.Value > os.time() then
-							rebirthBoostMult = 2
+						local rebirthBoostMultiplier = events and events:FindFirstChild("RebirthBoostMultiplier")
+						if rebirthEnd and rebirthBoostMultiplier and rebirthEnd.Value > os.time() then
+							rebirthBoostMult = math.max(1, rebirthBoostMultiplier.Value)
 						end
 
 						local mult1 = 2 ^ rebirthValue.Value

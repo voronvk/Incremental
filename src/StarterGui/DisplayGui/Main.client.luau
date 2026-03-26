@@ -11,6 +11,9 @@ local UIBlur = require(ReplicatedStorage.Shared:WaitForChild("UIBlur"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 
+local questClaimRequest = ReplicatedStorage:FindFirstChild("QuestRewardClaimRequest")
+local questClaimed = ReplicatedStorage:FindFirstChild("QuestRewardClaimed")
+
 -- Currencies
 local currencies = player:WaitForChild("Currencies")
 local corn = currencies:WaitForChild("Corn")
@@ -447,7 +450,7 @@ task.spawn(function()
 
 	refreshLabels()
 
-	local function setBoost(timerLabel, boostLabel, endTimeValue)
+	local function setBoost(timerLabel, boostLabel, endTimeValue, multValue)
 		-- Permite que falte uno de los dos (timer o boost label).
 		if not (timerLabel or boostLabel) then return end
 		local now = os.time()
@@ -464,7 +467,8 @@ task.spawn(function()
 		end
 		if boostLabel then
 			-- Nunca mostrar "0". Cuando expira: "x0".
-			boostLabel.Text = active and "x2" or "x0"
+			local mult = (multValue and type(multValue.Value) == "number") and multValue.Value or 2
+			boostLabel.Text = active and ("x" .. tostring(mult)) or "x0"
 		end
 	end
 
@@ -474,10 +478,10 @@ task.spawn(function()
 			refreshLabels()
 		end
 
-		setBoost(melonTimerLabel, melonBoostLabel, events:FindFirstChild("MelonBoostEndTime"))
-		setBoost(speedTimerLabel, speedBoostLabel, events:FindFirstChild("SpeedBoostEndTime"))
-		setBoost(rebirthTimerLabel, rebirthBoostLabel, events:FindFirstChild("RebirthBoostEndTime"))
-		setBoost(ascensionTimerLabel, ascensionBoostLabel, events:FindFirstChild("AscensionBoostEndTime"))
+		setBoost(melonTimerLabel, melonBoostLabel, events:FindFirstChild("MelonBoostEndTime"), events:FindFirstChild("MelonBoostMultiplier"))
+		setBoost(speedTimerLabel, speedBoostLabel, events:FindFirstChild("SpeedBoostEndTime"), events:FindFirstChild("SpeedBoostMultiplier"))
+		setBoost(rebirthTimerLabel, rebirthBoostLabel, events:FindFirstChild("RebirthBoostEndTime"), events:FindFirstChild("RebirthBoostMultiplier"))
+		setBoost(ascensionTimerLabel, ascensionBoostLabel, events:FindFirstChild("AscensionBoostEndTime"), events:FindFirstChild("AscensionBoostMultiplier"))
 		task.wait(1)
 	end
 end)
@@ -490,13 +494,23 @@ local FILL_TWEEN_TIME = 0.25
 if questFrame and questFrameData then
 	local events = player:WaitForChild("Events")
 
+	local refreshClaimedFrame: (() -> ())?
+
+	local function formatQuestNumber(qType: number, n: number)
+		-- Solo abreviar para objetivos/progreso gigantes (melons / rebirth). Playtime queda en minutos normales.
+		if qType == 1 then
+			return tostring(math.floor(n))
+		end
+		return Abbreviate(n)
+	end
+
 	local function getQuestName(qType, target)
 		if qType == 1 then
-			return "Play for " .. target .. " Minutes"
+			return "Play for " .. formatQuestNumber(qType, target) .. " Minutes"
 		elseif qType == 2 then
-			return "Collect " .. target .. " Melons"
+			return "Collect " .. formatQuestNumber(qType, target) .. " Melons"
 		else
-			return "Rebirth " .. target .. " times"
+			return "Rebirth " .. formatQuestNumber(qType, target) .. " times"
 		end
 	end
 
@@ -523,7 +537,7 @@ if questFrame and questFrameData then
 
 			local progressLabel = questButton and (questButton:FindFirstChildOfClass("TextLabel") or questButton:FindFirstChildWhichIsA("TextLabel", true))
 			if progressLabel then
-				progressLabel.Text = isDone and "Done!" or (progress .. "/" .. target)
+				progressLabel.Text = isDone and "Done!" or (formatQuestNumber(qType, progress) .. "/" .. formatQuestNumber(qType, target))
 			end
 
 			if fill then
@@ -563,5 +577,217 @@ if questFrame and questFrameData then
 		if q then
 			setupQuestUI(i, q)
 		end
+	end
+
+	-- RewardFrame: ClaimQuest2 + ClaimDoubleQuest
+	local rewardFrame = questFrame:FindFirstChild("RewardFrame", true)
+	if rewardFrame then
+		local claimButton = rewardFrame:FindFirstChild("ClaimQuest2", true)
+		local claimDoubleButton = rewardFrame:FindFirstChild("ClaimDoubleQuest", true)
+		-- `WarnLabel` es un TextLabel (hijo de QuestFrame o debajo)
+		local warnLabelTemplate = questFrame:FindFirstChild("WarnLabel", true)
+
+		local warnCount = 0
+		local warnToken = 0
+		local warnClone: TextLabel? = nil
+		local warnScale: UIScale? = nil
+
+		local WARN_HIDE_SCALE_SEC = 0.08
+
+		local function showWarn()
+			if not (warnLabelTemplate and warnLabelTemplate:IsA("TextLabel")) then
+				return
+			end
+
+			-- Ocultar la plantilla; el aviso visible es el clon
+			warnLabelTemplate.Visible = false
+
+			warnCount += 1
+			warnToken += 1
+			local myToken = warnToken
+
+			if not warnClone or not warnClone.Parent then
+				warnClone = warnLabelTemplate:Clone() :: TextLabel
+				warnClone.Name = "WarnLabel_Clone"
+				warnClone.Visible = true
+				warnClone.Parent = warnLabelTemplate.Parent
+
+				warnScale = warnClone:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+				warnScale.Scale = 1
+				warnScale.Parent = warnClone
+			end
+
+			local baseText = "You need to complete the quest First!"
+			local fullText = (warnCount > 1) and (baseText .. " (x" .. tostring(warnCount) .. ")") or baseText
+			warnClone.Text = fullText
+			warnClone.Visible = true
+
+			if warnScale then
+				warnScale.Scale = 0.75
+				TweenService:Create(warnScale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			end
+
+			task.delay(3, function()
+				if warnToken ~= myToken then
+					return
+				end
+				warnCount = 0
+				local toHide = warnClone
+				local scaleObj = warnScale
+				warnClone = nil
+				warnScale = nil
+				if toHide and toHide.Parent and scaleObj then
+					local tw = TweenService:Create(scaleObj, TweenInfo.new(WARN_HIDE_SCALE_SEC, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 0 })
+					tw.Completed:Connect(function()
+						if toHide.Parent then
+							toHide:Destroy()
+						end
+					end)
+					tw:Play()
+				elseif toHide and toHide.Parent then
+					toHide:Destroy()
+				end
+			end)
+		end
+
+		local function allDone()
+			for i = 1, 3 do
+				local t = events:FindFirstChild("Quest" .. i .. "Target")
+				local p = events:FindFirstChild("Quest" .. i .. "Progress")
+				if not (t and p) then
+					return false
+				end
+				if p.Value < t.Value then
+					return false
+				end
+			end
+			local claimed = events:FindFirstChild("QuestRewardClaimed")
+			return claimed and claimed.Value == 0
+		end
+
+		-- Nunca poner Active=false: si no, Roblox no dispara Activated y no puede salir el WarnLabel.
+		local function setEnabled(btn: Instance?, enabled: boolean)
+			if not btn or not btn:IsA("GuiButton") then return end
+			btn.Active = true
+			btn.AutoButtonColor = enabled
+			if btn:IsA("TextButton") then
+				btn.BackgroundTransparency = enabled and 0 or 0.35
+			end
+		end
+
+		local function refreshRewardButtons()
+			local ok = allDone()
+			setEnabled(claimButton, ok)
+			setEnabled(claimDoubleButton, ok)
+		end
+
+		if claimButton and claimButton:IsA("GuiButton") then
+			local img = claimButton:FindFirstChild("ImageLabel")
+			ButtonScaleEffect.applyScaleEffect(claimButton, img or claimButton)
+			claimButton.Activated:Connect(function()
+				refreshRewardButtons()
+				if not allDone() then
+					showWarn()
+					return
+				end
+				if questClaimRequest and questClaimRequest:IsA("RemoteEvent") then
+					questClaimRequest:FireServer()
+				end
+			end)
+		end
+
+		if claimDoubleButton and claimDoubleButton:IsA("GuiButton") then
+			local img = claimDoubleButton:FindFirstChild("ImageLabel")
+			ButtonScaleEffect.applyScaleEffect(claimDoubleButton, img or claimDoubleButton)
+			claimDoubleButton.Activated:Connect(function()
+				refreshRewardButtons()
+				if not allDone() then
+					showWarn()
+					return
+				end
+				MarketplaceService:PromptProductPurchase(player, 3563363605)
+			end)
+		end
+
+		for i = 1, 3 do
+			local p = events:FindFirstChild("Quest" .. i .. "Progress")
+			local t = events:FindFirstChild("Quest" .. i .. "Target")
+			if p then p.Changed:Connect(refreshRewardButtons) end
+			if t then t.Changed:Connect(refreshRewardButtons) end
+		end
+		local claimed = events:FindFirstChild("QuestRewardClaimed")
+		if claimed then claimed.Changed:Connect(refreshRewardButtons) end
+
+		refreshRewardButtons()
+	end
+
+	-- ClaimedFrame: visible solo tras reclamar (QuestRewardClaimed == 1); timerLabel = tiempo hasta el reset diario
+	local QUEST_RESET_SEC = 24 * 60 * 60
+	local claimedFrame = questFrame:FindFirstChild("ClaimedFrame", true)
+	local timerLabelClaimed = claimedFrame and (claimedFrame:FindFirstChild("timerLabel", true) or claimedFrame:FindFirstChild("TimerLabel", true))
+
+	if claimedFrame and claimedFrame:IsA("GuiObject") then
+		local function formatCountdown(totalSeconds: number): string
+			totalSeconds = math.max(0, math.floor(totalSeconds))
+			local h = math.floor(totalSeconds / 3600)
+			local m = math.floor((totalSeconds % 3600) / 60)
+			local s = totalSeconds % 60
+			return string.format("%dh %dm %ds", h, m, s)
+		end
+
+		refreshClaimedFrame = function()
+			local claimedVal = events:FindFirstChild("QuestRewardClaimed")
+			local lastResetVal = events:FindFirstChild("QuestLastResetTime")
+			local isClaimed = claimedVal and claimedVal:IsA("NumberValue") and claimedVal.Value == 1
+			if not isClaimed then
+				claimedFrame.Visible = false
+				return
+			end
+			claimedFrame.Visible = true
+			if timerLabelClaimed and timerLabelClaimed:IsA("TextLabel") then
+				local lr = (lastResetVal and lastResetVal:IsA("NumberValue") and lastResetVal.Value) or 0
+				local nextReset = lr + QUEST_RESET_SEC
+				local remaining = nextReset - os.time()
+				timerLabelClaimed.Text = formatCountdown(remaining)
+			end
+		end
+
+		task.spawn(function()
+			while player.Parent do
+				refreshClaimedFrame()
+				task.wait(1)
+			end
+		end)
+
+		local claimedNv = events:FindFirstChild("QuestRewardClaimed")
+		if claimedNv then
+			claimedNv.Changed:Connect(refreshClaimedFrame)
+		end
+		local lastResetNv = events:FindFirstChild("QuestLastResetTime")
+		if lastResetNv then
+			lastResetNv.Changed:Connect(refreshClaimedFrame)
+		end
+
+		refreshClaimedFrame()
+	end
+
+	-- Sonido al claimear recompensa
+	if questClaimed and questClaimed:IsA("RemoteEvent") then
+		questClaimed.OnClientEvent:Connect(function(ok)
+			if ok ~= true then
+				return
+			end
+			if refreshClaimedFrame then
+				refreshClaimedFrame()
+			end
+			local sound = Instance.new("Sound")
+			sound.SoundId = "rbxassetid://129349771709668"
+			sound.Volume = 1
+			sound.Parent = game:GetService("SoundService")
+			sound:Play()
+			sound.Ended:Connect(function()
+				sound:Destroy()
+			end)
+		end)
 	end
 end

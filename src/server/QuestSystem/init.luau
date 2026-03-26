@@ -7,12 +7,22 @@ local RunService = game:GetService("RunService")
 
 local QUEST_TYPES = { "play", "melons", "rebirth" }
 local PLAY_RANGE = { 10, 35 }
-local MELONS_RANGE = { 500, 2500 }
-local REBIRTH_RANGE = { 5, 25 }
+local MELONS_RANGE = { 10_000_000, 1_000_000_000_000 }
+local REBIRTH_RANGE = { 500_000, 1_000_000_000_000 }
 local RESET_INTERVAL_SEC = 24 * 60 * 60 -- 24 horas
 
+-- Luau: math.random(m, n) solo acepta enteros en un rango acotado (~2^31-1).
+-- Objetivos de melons/rebirth pueden ser > 2^31; usar float + floor.
+local MAX_INT_RANDOM = 2147483647
+
 local function randomInRange(min, max)
-	return math.random(min, max)
+	if min > max then
+		min, max = max, min
+	end
+	if max <= MAX_INT_RANDOM then
+		return math.random(min, max)
+	end
+	return min + math.floor(math.random() * (max - min + 1))
 end
 
 local function generateQuest()
@@ -51,6 +61,7 @@ local function ensureQuestValues(player)
 		"Quest2Type", "Quest2Target", "Quest2Progress",
 		"Quest3Type", "Quest3Target", "Quest3Progress",
 		"QuestLastResetTime", "QuestPlaytimeAtReset", "QuestRebirthsAtReset", "QuestMelonsCollected",
+		"QuestRewardClaimed",
 	}
 	for _, name in ipairs(names) do
 		if not events:FindFirstChild(name) then
@@ -83,6 +94,10 @@ local function resetQuests(player)
 	events:FindFirstChild("QuestPlaytimeAtReset").Value = playtime and playtime.Value or 0
 	events:FindFirstChild("QuestRebirthsAtReset").Value = rebirths and rebirths.Value or 0
 	events:FindFirstChild("QuestMelonsCollected").Value = 0
+	local claimed = events:FindFirstChild("QuestRewardClaimed")
+	if claimed then
+		claimed.Value = 0
+	end
 end
 
 local function updateQuestProgress(player)
