@@ -106,6 +106,12 @@ event.OnServerEvent:Connect(function(player, cornType)
 		local melonBoostMultiplier = events and events:FindFirstChild("MelonBoostMultiplier")
 		if melonEnd and melonBoostMultiplier and melonEnd.Value > os.time() then
 			melonBoostMult = math.max(1, melonBoostMultiplier.Value)
+			-- LuckShop option B: +1 a todos los boosts mientras esté activo
+			local allEnd = events:FindFirstChild("LuckAllBoostEndTime")
+			local allAdd = events:FindFirstChild("LuckAllBoostAdd")
+			if allEnd and allAdd and allEnd:IsA("NumberValue") and allAdd:IsA("NumberValue") and allEnd.Value > os.time() then
+				melonBoostMult += math.max(0, allAdd.Value)
+			end
 		end
 
 		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * groupMulti * melonBoostMult)

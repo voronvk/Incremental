@@ -64,6 +64,12 @@ rebirthEvent.OnServerEvent:Connect(function(player)
 	local rebirthBoostMultiplier = events and events:FindFirstChild("RebirthBoostMultiplier")
 	if rebirthEnd and rebirthBoostMultiplier and rebirthEnd.Value > os.time() then
 		rebirthBoostMult = math.max(1, rebirthBoostMultiplier.Value)
+		-- LuckShop option B: +1 a todos los boosts mientras esté activo
+		local allEnd = events:FindFirstChild("LuckAllBoostEndTime")
+		local allAdd = events:FindFirstChild("LuckAllBoostAdd")
+		if allEnd and allAdd and allEnd:IsA("NumberValue") and allAdd:IsA("NumberValue") and allEnd.Value > os.time() then
+			rebirthBoostMult += math.max(0, allAdd.Value)
+		end
 	end
 
 	if corn.Value >= cost then
@@ -117,6 +123,12 @@ task.spawn(function()
 						local rebirthBoostMultiplier = events and events:FindFirstChild("RebirthBoostMultiplier")
 						if rebirthEnd and rebirthBoostMultiplier and rebirthEnd.Value > os.time() then
 							rebirthBoostMult = math.max(1, rebirthBoostMultiplier.Value)
+							-- LuckShop option B: +1 a todos los boosts mientras esté activo
+							local allEnd = events:FindFirstChild("LuckAllBoostEndTime")
+							local allAdd = events:FindFirstChild("LuckAllBoostAdd")
+							if allEnd and allAdd and allEnd:IsA("NumberValue") and allAdd:IsA("NumberValue") and allEnd.Value > os.time() then
+								rebirthBoostMult += math.max(0, allAdd.Value)
+							end
 						end
 
 						local mult1 = 2 ^ rebirthValue.Value

@@ -12,6 +12,8 @@ local upgtree2_29 = upgrades:WaitForChild("UpgTree2_29")
 local events = player:WaitForChild("Events")
 local speedBoostEndTime = events:WaitForChild("SpeedBoostEndTime")
 local speedBoostMultiplier = events:WaitForChild("SpeedBoostMultiplier")
+local luckAllBoostEndTime = events:FindFirstChild("LuckAllBoostEndTime")
+local luckAllBoostAdd = events:FindFirstChild("LuckAllBoostAdd")
 local defaultspeed = 16
 
 local function checkGamepass()
@@ -43,6 +45,12 @@ local function applyWalkspeedBonus()
 	end
 
 	local speedBoostMult = (speedBoostEndTime.Value > os.time()) and math.max(1, speedBoostMultiplier.Value) or 1
+	-- LuckShop option B: +1 a todos los boosts mientras esté activo
+	if luckAllBoostEndTime and luckAllBoostAdd and luckAllBoostEndTime:IsA("NumberValue") and luckAllBoostAdd:IsA("NumberValue") then
+		if luckAllBoostEndTime.Value > os.time() then
+			speedBoostMult += math.max(0, luckAllBoostAdd.Value)
+		end
+	end
 	speed = speed * speedBoostMult
 
 	humanoid.WalkSpeed = speed
@@ -69,3 +77,9 @@ upgtree2_28:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
 upgtree2_29:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
 speedBoostEndTime:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
 speedBoostMultiplier:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
+if luckAllBoostEndTime and luckAllBoostEndTime:IsA("NumberValue") then
+	luckAllBoostEndTime:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
+end
+if luckAllBoostAdd and luckAllBoostAdd:IsA("NumberValue") then
+	luckAllBoostAdd:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
+end

@@ -69,6 +69,12 @@ upgradeEvent.OnServerEvent:Connect(function(player)
 	local ascBoostMultiplier = events and events:FindFirstChild("AscensionBoostMultiplier")
 	if ascEnd and ascBoostMultiplier and ascEnd.Value > os.time() then
 		ascensionBoostMult = math.max(1, ascBoostMultiplier.Value)
+		-- LuckShop option B: +1 a todos los boosts mientras esté activo
+		local allEnd = events:FindFirstChild("LuckAllBoostEndTime")
+		local allAdd = events:FindFirstChild("LuckAllBoostAdd")
+		if allEnd and allAdd and allEnd:IsA("NumberValue") and allAdd:IsA("NumberValue") and allEnd.Value > os.time() then
+			ascensionBoostMult += math.max(0, allAdd.Value)
+		end
 	end
 
 	ascensions.Value += math.floor(1 * mult * mult2 * mult3 * ascensionBoostMult)

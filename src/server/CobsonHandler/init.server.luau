@@ -3,10 +3,18 @@ local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 local RunService = game:GetService("RunService")
 
--- QuickShop: +300% luck por 2 min, stackable
-local QUICKSHOP_LUCK_PRODUCT_ID = 3553201276
-local LUCK_BOOST_DURATION = 120 -- segundos
-local LUCK_BOOST_PER_STACK = 3 -- +300% = 4x por stack (1 + 3)
+-- LuckShop: +x1 luck multiplier por 15 min, stackable por tiempo
+local LUCKSHOP_15MIN_PRODUCT_ID = 3553201276
+local LUCK_BOOST_DURATION = 15 * 60
+
+-- LuckShop option B: +1 a TODOS los boosts (Melon/Speed/Rebirth/Ascension) mientras esté activo
+local LUCK_ALLBOOST_ADD = 1
+local DEBUG_RECEIPTS = true
+local function dbgReceipt(...)
+	if DEBUG_RECEIPTS then
+		warn("[ProcessReceipt]", ...)
+	end
+end
 
 -- BoostShop (Developer Products)
 local MELON_BOOST_15MIN_PRODUCT_ID = 3560570963
@@ -15,8 +23,14 @@ local EVERYTHING_BOOST_15MIN_PRODUCT_ID = 3560571168
 local EVERYTHING_BOOST_1HOUR_PRODUCT_ID = 3560571293
 local DOUBLE_QUEST_REWARD_PRODUCT_ID = 3563363605
 
+-- Rotating RobuxGui products
+local MELONSHOP_30MIN_PRODUCT_ID = 3564513610 -- x2 melones 30 min (stackea tiempo)
+local SPEEDSHOP_30MIN_PRODUCT_ID = 3564513530 -- x1.5 velocidad 30 min (stackea tiempo)
+
 local MELON_BOOST_DURATION_15MIN = 15 * 60
 local MELON_BOOST_DURATION_1HOUR = 60 * 60
+local BOOST_DURATION_30MIN = 30 * 60
+local LUCK_DURATION_15MIN = 15 * 60
 
 local function extendBoostEndTime(numberValue, durationSeconds)
 	if not numberValue then return end
@@ -261,6 +275,7 @@ local function processReceipt(receiptInfo)
 	if not player then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
+	dbgReceipt("User", userId, "ProductId", productId, "PurchaseId", purchaseId, "Player", player.Name)
 
 	if gemProductValues[productId] then
 		local gemeralds = safelyGetGemeralds(player)
@@ -353,13 +368,45 @@ local function processReceipt(receiptInfo)
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
 
-	elseif productId == QUICKSHOP_LUCK_PRODUCT_ID then
-		local endTimes = player:GetAttribute("LuckBoostEndTimes")
-		if type(endTimes) ~= "table" then
-			endTimes = {}
+	elseif productId == LUCKSHOP_15MIN_PRODUCT_ID then
+		dbgReceipt("Grant LuckShop", "player", player.Name)
+		-- 1) Luck multiplier usado por spawns (atributo LuckBoostMultiplier vía Heartbeat abajo)
+		local luckEnd = safelyGetBoostEndTime(player, "LuckBoostEndTime")
+		local luckMult = safelyGetBoostMultiplier(player, "LuckBoostMultiplier")
+		-- 2) Boost global que suma +1 a todos los boosts en cálculos (no cambia timers base)
+		local allEnd = safelyGetBoostEndTime(player, "LuckAllBoostEndTime")
+		local allAdd = safelyGetBoostMultiplier(player, "LuckAllBoostAdd")
+		if not (luckEnd and allEnd and allAdd) then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
-		table.insert(endTimes, os.time() + LUCK_BOOST_DURATION)
-		player:SetAttribute("LuckBoostEndTimes", endTimes)
+		-- LuckShop: fijo a 2x mientras esté activo; si recompras suma tiempo (no multiplica más)
+		setBoostMultiplierIfInactive(luckEnd, luckMult, 2)
+		extendBoostEndTime(luckEnd, LUCK_BOOST_DURATION)
+		-- Option B: fijo a +1 mientras esté activo; si recompras suma tiempo
+		setBoostMultiplierIfInactive(allEnd, allAdd, LUCK_ALLBOOST_ADD)
+		extendBoostEndTime(allEnd, LUCK_BOOST_DURATION)
+
+	elseif productId == MELONSHOP_30MIN_PRODUCT_ID then
+		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")
+		local melonMult = safelyGetBoostMultiplier(player, "MelonBoostMultiplier")
+		if not melonEnd then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		setBoostMultiplierIfInactive(melonEnd, melonMult, 2)
+		extendBoostEndTime(melonEnd, BOOST_DURATION_30MIN)
+		player:SetAttribute("LastBoostProduct", tostring(productId))
+		player:SetAttribute("LastMelonBoostEnd", melonEnd.Value)
+
+	elseif productId == SPEEDSHOP_30MIN_PRODUCT_ID then
+		local speedEnd = safelyGetBoostEndTime(player, "SpeedBoostEndTime")
+		local speedMult = safelyGetBoostMultiplier(player, "SpeedBoostMultiplier")
+		if not speedEnd then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		setBoostMultiplierIfInactive(speedEnd, speedMult, 1.5)
+		extendBoostEndTime(speedEnd, BOOST_DURATION_30MIN)
+		player:SetAttribute("LastBoostProduct", tostring(productId))
+		player:SetAttribute("LastSpeedBoostEnd", speedEnd.Value)
 
 	else
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -378,19 +425,23 @@ MarketplaceService.ProcessReceipt = processReceipt
 RunService.Heartbeat:Connect(function()
 	local now = os.time()
 	for _, player in ipairs(Players:GetPlayers()) do
-		local endTimes = player:GetAttribute("LuckBoostEndTimes")
-		if type(endTimes) == "table" and #endTimes > 0 then
-			local valid = {}
-			for _, et in ipairs(endTimes) do
-				if et > now then
-					table.insert(valid, et)
-				end
-			end
-			player:SetAttribute("LuckBoostEndTimes", valid)
-			local stacks = #valid
-			player:SetAttribute("LuckBoostMultiplier", 1 + (stacks * LUCK_BOOST_PER_STACK))
+		local events = player:FindFirstChild("Events")
+		local endTime = events and events:FindFirstChild("LuckBoostEndTime")
+		local multVal = events and events:FindFirstChild("LuckBoostMultiplier")
+		if endTime and multVal and endTime:IsA("NumberValue") and multVal:IsA("NumberValue") and endTime.Value > now then
+			player:SetAttribute("LuckBoostMultiplier", math.max(1, multVal.Value))
 		else
 			player:SetAttribute("LuckBoostMultiplier", 1)
 		end
+
+		-- Exponer el +1 global como Attribute para clientes (por si lo quieren usar)
+		local allEnd = events and events:FindFirstChild("LuckAllBoostEndTime")
+		local allAdd = events and events:FindFirstChild("LuckAllBoostAdd")
+		if allEnd and allAdd and allEnd:IsA("NumberValue") and allAdd:IsA("NumberValue") and allEnd.Value > now then
+			player:SetAttribute("LuckAllBoostAdd", math.max(0, allAdd.Value))
+		else
+			player:SetAttribute("LuckAllBoostAdd", 0)
+		end
 	end
 end)
+
