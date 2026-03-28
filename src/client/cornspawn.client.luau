@@ -60,19 +60,30 @@ local clearCornEvent = ReplicatedStorage:WaitForChild("ClearLocalCornEvent")
 local myCorn = {}
 local spawnInterval = 3
 local pickupRange = 2.5
-local lastCollectSoundTime = 0
-local SOUND_COOLDOWN = 1
 
-local collectsound = Instance.new("Sound")
-collectsound.SoundId = "rbxassetid://101429032102613"
-collectsound.Parent = SoundService
+local COLLECT_SOUND_ID = "rbxassetid://140206660137491"
+local COLLECT_SOUND_VOLUME = 0.4
 
-local function checkMuted()
-	collectsound.Volume = (player:WaitForChild("Settings"):WaitForChild("SfxMuted").Value >= 1) and 0 or 1
+local function isSfxMuted(): boolean
+	local settings = player:FindFirstChild("Settings")
+	local sfxMuted = settings and settings:FindFirstChild("SfxMuted")
+	return sfxMuted ~= nil and sfxMuted.Value >= 1
 end
 
-player:WaitForChild("Settings"):WaitForChild("SfxMuted"):GetPropertyChangedSignal("Value"):Connect(checkMuted)
-checkMuted()
+-- Una instancia por recogida: cada clip va al final y se pueden superponer.
+local function playCollectSound()
+	if isSfxMuted() then
+		return
+	end
+	local sound = Instance.new("Sound")
+	sound.SoundId = COLLECT_SOUND_ID
+	sound.Volume = COLLECT_SOUND_VOLUME
+	sound.Parent = SoundService
+	sound:Play()
+	sound.Ended:Connect(function()
+		sound:Destroy()
+	end)
+end
 
 clearCornEvent.OnClientEvent:Connect(function()
 	for i = #myCorn, 1, -1 do
@@ -173,7 +184,6 @@ RunService.Heartbeat:Connect(function()
 	if not root then return end
 
 	local range = pickupRange + collectradius.Value * 0.5 + 0.1 + upgtree10.Value
-	local soundPlayed = false
 
 	for i = #myCorn, 1, -1 do
 		local corn = myCorn[i]
@@ -184,7 +194,7 @@ RunService.Heartbeat:Connect(function()
 				collectEvent:FireServer(corn.Name)
 				corn:Destroy()
 				table.remove(myCorn, i)
-				if not soundPlayed then collectsound:Play(); soundPlayed = true end
+				playCollectSound()
 			end
 		end
 	end

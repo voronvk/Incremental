@@ -14,11 +14,89 @@ local MELONSHOP_PRODUCT_ID = 3564513610
 local SPEEDSHOP_PRODUCT_ID = 3564513530
 local LUCKSHOP_PRODUCT_ID = 3553201276
 
-local DEBUG_ROBUXGUI = true
-local function dbg(...)
-	if DEBUG_ROBUXGUI then
-		warn("[RobuxGui]", ...)
+-- StarterFrame: bundle grande (mismo producto que siempre)
+local EXCLUSIVE_OFFER_PRODUCT_ID = 3564690970
+-- AdvancedFrame: Rebirth x2 durante 120 min — crea este Developer Product en Creator y ajusta el ID si difiere
+local ADVANCED_OFFER_PRODUCT_ID = 3564690971
+local OFFER_APPEAR_SOUND_ID = "rbxassetid://99608180022223"
+-- StarterFrame: tiempos originales (40–200s primera vez, 150–300s si cierra sin comprar)
+local OFFER_FIRST_DELAY_MIN = 40
+local OFFER_FIRST_DELAY_MAX = 200
+local OFFER_RESHOW_DELAY_MIN = 150
+local OFFER_RESHOW_DELAY_MAX = 300
+-- AdvancedFrame: recurrente cada 360s; pon true para testear cada 15s
+local TEST_ADVANCED_OFFER_TIMING = false
+local ADVANCED_OFFER_RECUR_INTERVAL_SEC = TEST_ADVANCED_OFFER_TIMING and 15 or 360
+local ExclusiveOffer = {
+	close = nil,
+}
+local AdvancedOffer = {
+	close = nil,
+}
+
+-- Compartido entre StarterFrame y AdvancedFrame (mismo Background / duck de música)
+local offerBackdropOpenCount = 0
+local offerBackdropDuckedEntries = {}
+local offerSuppressedGuiSnapshot = {} -- [ScreenGui] = Enabled antes del offer
+
+local function suppressOtherPlayerGuisForOffer()
+	local pg = player:FindFirstChildOfClass("PlayerGui")
+	if not pg then
+		return
 	end
+	for _, child in ipairs(pg:GetChildren()) do
+		if child:IsA("ScreenGui") and child ~= robuxGui then
+			if offerSuppressedGuiSnapshot[child] == nil then
+				offerSuppressedGuiSnapshot[child] = child.Enabled
+			end
+			child.Enabled = false
+		end
+	end
+end
+
+local function restoreOtherPlayerGuisFromOffer()
+	for gui, wasEnabled in pairs(offerSuppressedGuiSnapshot) do
+		if gui.Parent then
+			gui.Enabled = wasEnabled
+		end
+	end
+	table.clear(offerSuppressedGuiSnapshot)
+end
+
+local function collectSoundsToDuckOffer()
+	local list = {}
+	local function addFrom(parent)
+		if not parent then
+			return
+		end
+		for _, d in ipairs(parent:GetDescendants()) do
+			if d:IsA("Sound") and d.Playing and d.Volume > 0 then
+				table.insert(list, d)
+			end
+		end
+	end
+	addFrom(SoundService)
+	local pg = player:FindFirstChildOfClass("PlayerGui")
+	addFrom(pg)
+	return list
+end
+
+local function duckMusicOfferShared()
+	offerBackdropDuckedEntries = {}
+	for _, snd in ipairs(collectSoundsToDuckOffer()) do
+		table.insert(offerBackdropDuckedEntries, { sound = snd, vol = snd.Volume })
+		TweenService:Create(snd, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { Volume = math.max(0.02, snd.Volume * 0.12) }):Play()
+	end
+end
+
+local function restoreMusicOfferShared()
+	for _, entry in ipairs(offerBackdropDuckedEntries) do
+		local snd = entry.sound
+		if snd and snd.Parent then
+			TweenService:Create(snd, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { Volume = entry.vol }):Play()
+		end
+	end
+	offerBackdropDuckedEntries = {}
 end
 
 local ROTATE_SECONDS = 30
@@ -82,8 +160,6 @@ local melonShop = getButton("MelonShop")
 local speedShop = getButton("SpeedShop")
 local luckShop = getButton("LuckShop")
 
-dbg("Buttons found:", "LuckShop=", luckShop and luckShop:GetFullName() or "nil", "SpeedShop=", speedShop and speedShop:GetFullName() or "nil", "MelonShop=", melonShop and melonShop:GetFullName() or "nil")
-
 local rotatingButtons = {}
 if luckShop then table.insert(rotatingButtons, luckShop) end
 if speedShop then table.insert(rotatingButtons, speedShop) end
@@ -96,7 +172,6 @@ local function hookPurchase(btn, productId)
 		return
 	end
 	local function prompt()
-		dbg("PromptProductPurchase", productId, "from", btn:GetFullName())
 		MarketplaceService:PromptProductPurchase(player, productId)
 	end
 	-- Extra: some UI uses ImageButton/TextButton; ensure we always connect.
@@ -130,7 +205,6 @@ local function getBuyLabelTemplate()
 	if any and any:IsA("GuiObject") then
 		return any
 	end
-	dbg("BuyLabel not found under RobuxGui")
 	return nil
 end
 
@@ -147,7 +221,6 @@ local function playPurchaseSound()
 	end
 
 	if reward and reward:IsA("Sound") then
-		dbg("Playing reward sound:", reward:GetFullName())
 		local s = reward:Clone()
 		-- Play locally from SoundService so it always works
 		s.Parent = SoundService
@@ -155,8 +228,6 @@ local function playPurchaseSound()
 			s:Destroy()
 		end)
 		s:Play()
-	else
-		dbg("Reward sound not found in ReplicatedStorage.Sounds.Reward (or fallbacks).")
 	end
 end
 
@@ -195,7 +266,6 @@ local function showPurchaseToast(productId)
 	if not buyLabelTemplate then
 		return
 	end
-	dbg("ShowPurchaseToast", productId, "template=", buyLabelTemplate:GetFullName())
 
 	local name, duration = productInfo(productId)
 	local toast = buyLabelTemplate:Clone()
@@ -213,7 +283,13 @@ local function showPurchaseToast(productId)
 	end
 
 	if textObj then
-		textObj.Text = ("Purchase successful! You bought %s for %s!"):format(name, formatTime(duration))
+		if productId == EXCLUSIVE_OFFER_PRODUCT_ID then
+			textObj.Text = "You Bought the Exclusive Offer"
+		elseif productId == ADVANCED_OFFER_PRODUCT_ID then
+			textObj.Text = "You Bought the Advanced Offer (Rebirth x2, 120 min)"
+		else
+			textObj.Text = ("Purchase successful! You bought %s for %s!"):format(name, formatTime(duration))
+		end
 	end
 
 	local scale = ensureUIScale(toast)
@@ -242,23 +318,27 @@ local function showPurchaseToast(productId)
 end
 
 MarketplaceService.PromptProductPurchaseFinished:Connect(function(plr, productId, purchased)
-	local who = tostring(plr)
 	local isLocal = false
-
 	if type(plr) == "number" then
-		who = "UserId:" .. tostring(plr)
 		isLocal = (plr == player.UserId)
 	else
-		local okName, name = pcall(function()
-			return plr.Name
-		end)
-		if okName then
-			who = tostring(name)
-		end
 		isLocal = (plr == player)
 	end
 
-	dbg("PromptProductPurchaseFinished", "player=", who, "productId=", productId, "purchased=", purchased)
+	if isLocal and purchased and type(productId) == "number" then
+		if productId == EXCLUSIVE_OFFER_PRODUCT_ID then
+			local fn = ExclusiveOffer.close
+			if fn then
+				fn()
+			end
+		elseif productId == ADVANCED_OFFER_PRODUCT_ID then
+			local fn = AdvancedOffer.close
+			if fn then
+				fn()
+			end
+		end
+	end
+
 	if isLocal and purchased and type(productId) == "number" then
 		showPurchaseToast(productId)
 	end
@@ -270,11 +350,9 @@ local function startRotationBar()
 	local fill = bar and bar:FindFirstChild("Fill", true)
 
 	if not fill then
-		dbg("Bar not found")
 		return
 	end
 	if not fill:IsA("GuiObject") then
-		dbg("Fill exists but is not GuiObject:", fill.ClassName)
 		return
 	end
 
@@ -287,8 +365,6 @@ local function startRotationBar()
 	task.spawn(function()
 		if #rotatingButtons > 0 then
 			showOnly(rotatingButtons[1], rotatingButtons)
-		else
-			dbg("No rotating buttons found")
 		end
 
 		local idx = 1
@@ -309,4 +385,207 @@ local function startRotationBar()
 	end)
 end
 
+--- Misma lógica que StarterFrame: Background, YesButton, CloseButton, duck música, sonido aparición.
+--- Si recurringIntervalSec es un número, la oferta se muestra cada X segundos (no usa delays aleatorios ni re-show al cerrar).
+--- Si no es recurring: bucle con primera espera + re-shows (Starter). Recurring: intervalo fijo (Advanced).
+local function setupOfferFrame(
+	offerState,
+	frameName: string,
+	firstDelayMin: number,
+	firstDelayMax: number,
+	reshowDelayMin: number,
+	reshowDelayMax: number,
+	productId: number,
+	recurringIntervalSec: number?
+)
+	task.spawn(function()
+		local events = player:WaitForChild("Events")
+		local purchasedFlag = events:WaitForChild("ExclusiveOfferPurchased", 120)
+		if not purchasedFlag then
+			return
+		end
+		local popupFrame = robuxGui:WaitForChild(frameName, 60)
+		local background = robuxGui:WaitForChild("Background", 60)
+		if not popupFrame or not background then
+			return
+		end
+		if not background:IsA("GuiObject") then
+			return
+		end
+
+		local yesButton = popupFrame:WaitForChild("YesButton", 30)
+		local closeButton = popupFrame:WaitForChild("CloseButton", 30)
+		if not yesButton or not closeButton then
+			return
+		end
+
+		local scheduleToken = 0
+		local recurringMode = type(recurringIntervalSec) == "number" and recurringIntervalSec > 0
+
+		local function isPurchased()
+			return purchasedFlag and purchasedFlag:IsA("NumberValue") and purchasedFlag.Value >= 1
+		end
+
+		local uiScale = popupFrame:FindFirstChildOfClass("UIScale")
+		if not uiScale then
+			uiScale = Instance.new("UIScale")
+			uiScale.Scale = 1
+			uiScale.Parent = popupFrame
+		end
+
+		popupFrame.Visible = false
+		uiScale.Scale = 0
+		background.BackgroundTransparency = 1
+
+		local function playOfferAppearSound()
+			local s = Instance.new("Sound")
+			s.SoundId = OFFER_APPEAR_SOUND_ID
+			s.Volume = 0.85
+			s.Parent = SoundService
+			s.Ended:Connect(function()
+				s:Destroy()
+			end)
+			s:Play()
+		end
+
+		for _, desc in ipairs(popupFrame:GetDescendants()) do
+			if desc:IsA("GuiButton") then
+				local img = desc:FindFirstChild("ImageLabel")
+				ButtonScaleEffect.applyScaleEffect(desc, img or desc)
+			end
+		end
+
+		local showOffer
+		local closeOffer
+
+		closeOffer = function()
+			if not popupFrame.Parent then
+				return
+			end
+			scheduleToken = scheduleToken + 1
+			offerBackdropOpenCount = math.max(0, offerBackdropOpenCount - 1)
+			TweenService:Create(uiScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0 }):Play()
+			if offerBackdropOpenCount <= 0 then
+				offerBackdropOpenCount = 0
+				TweenService:Create(background, TweenInfo.new(0.35, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+				restoreMusicOfferShared()
+				restoreOtherPlayerGuisFromOffer()
+			end
+			task.delay(0.25, function()
+				if popupFrame.Parent then
+					popupFrame.Visible = false
+				end
+			end)
+		end
+
+		showOffer = function()
+			if isPurchased() then
+				return
+			end
+			scheduleToken = scheduleToken + 1
+			offerBackdropOpenCount += 1
+			if offerBackdropOpenCount == 1 then
+				duckMusicOfferShared()
+				suppressOtherPlayerGuisForOffer()
+				background.BackgroundTransparency = 1
+				TweenService:Create(background, TweenInfo.new(0.4, Enum.EasingStyle.Quad), { BackgroundTransparency = 0.1 }):Play()
+			end
+			playOfferAppearSound()
+			popupFrame.Visible = true
+			uiScale.Scale = 0
+			TweenService:Create(uiScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		end
+
+		offerState.close = closeOffer
+
+		local function promptPurchase()
+			MarketplaceService:PromptProductPurchase(player, productId)
+		end
+
+		if yesButton:IsA("GuiButton") then
+			yesButton.Activated:Connect(promptPurchase)
+		else
+			yesButton.MouseButton1Click:Connect(promptPurchase)
+		end
+
+		if closeButton:IsA("GuiButton") then
+			closeButton.Activated:Connect(closeOffer)
+		else
+			closeButton.MouseButton1Click:Connect(closeOffer)
+		end
+
+		purchasedFlag.Changed:Connect(function()
+			if isPurchased() then
+				scheduleToken = scheduleToken + 1
+				if popupFrame.Visible then
+					closeOffer()
+				end
+			end
+		end)
+
+		if recurringMode then
+			while robuxGui.Parent do
+				task.wait(recurringIntervalSec :: number)
+				if isPurchased() then
+					continue
+				end
+				if popupFrame.Visible then
+					continue
+				end
+				showOffer()
+			end
+		else
+			-- Starter: primera vez delay largo; si cierran sin comprar, espera re-show y vuelve a salir en bucle
+			local firstCycle = true
+			while robuxGui.Parent do
+				if isPurchased() then
+					return
+				end
+				local dmin, dmax
+				if firstCycle then
+					dmin, dmax = firstDelayMin, firstDelayMax
+				else
+					dmin, dmax = reshowDelayMin, reshowDelayMax
+				end
+				task.wait(math.random(dmin, dmax))
+				firstCycle = false
+				if isPurchased() then
+					return
+				end
+				showOffer()
+				while popupFrame.Visible and robuxGui.Parent and not isPurchased() do
+					task.wait(0.2)
+				end
+				if isPurchased() then
+					return
+				end
+			end
+		end
+	end)
+end
+
+local function setupExclusiveOffer()
+	setupOfferFrame(
+		ExclusiveOffer,
+		"StarterFrame",
+		OFFER_FIRST_DELAY_MIN,
+		OFFER_FIRST_DELAY_MAX,
+		OFFER_RESHOW_DELAY_MIN,
+		OFFER_RESHOW_DELAY_MAX,
+		EXCLUSIVE_OFFER_PRODUCT_ID,
+		nil
+	)
+	setupOfferFrame(
+		AdvancedOffer,
+		"AdvancedFrame",
+		0,
+		0,
+		0,
+		0,
+		ADVANCED_OFFER_PRODUCT_ID,
+		ADVANCED_OFFER_RECUR_INTERVAL_SEC
+	)
+end
+
 startRotationBar()
+setupExclusiveOffer()

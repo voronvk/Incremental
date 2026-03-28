@@ -4,11 +4,27 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 local syncFn = ReplicatedStorage:WaitForChild("GamePassSyncRequest")
+local announce = ReplicatedStorage:WaitForChild("GamePassPurchaseAnnounce")
+
+local DISPLAY_NAMES = Config.GAMEPASS_DISPLAY_NAMES or {}
 
 local BUNDLE_ID = Config.BUNDLE_GAMEPASS_ID
 
 local function attrName(id)
 	return "OwnsGP_" .. tostring(id)
+end
+
+local function displayNameFor(gamePassId)
+	local n = DISPLAY_NAMES[gamePassId]
+	if type(n) == "string" and n ~= "" then
+		return n
+	end
+	return "a Gamepass"
+end
+
+local function announcePurchase(player, gamePassId)
+	local msg = string.format("%s just bought %s!", player.Name, displayNameFor(gamePassId))
+	announce:FireAllClients(msg)
 end
 
 local function bumpStamp(player)
@@ -66,10 +82,12 @@ syncFn.OnServerInvoke = function(player, gamePassId)
 	for _ = 1, 6 do
 		if syncOneFromMarketplace(player, gamePassId) then
 			bumpStamp(player)
+			announcePurchase(player, gamePassId)
 			return true
 		end
 		if applyBundleIfOwned(player) then
 			bumpStamp(player)
+			announcePurchase(player, BUNDLE_ID)
 			return true
 		end
 		task.wait(0.2)

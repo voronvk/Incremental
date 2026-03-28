@@ -44,6 +44,7 @@ local eventStats = {
 	"Quest3Type", "Quest3Target", "Quest3Progress",
 	"QuestLastResetTime", "QuestPlaytimeAtReset", "QuestRebirthsAtReset", "QuestMelonsCollected",
 	"QuestRewardClaimed",
+	"ExclusiveOfferPurchased",
 }
 
 local settingsStats = {
@@ -141,6 +142,11 @@ Players.PlayerAdded:Connect(function(player)
 		loadData(player, data)
 	else
 		warn("Could not load data for", player.Name)
+	end
+
+	local excl = player.Events:FindFirstChild("ExclusiveOfferPurchased")
+	if excl and excl:IsA("NumberValue") then
+		player:SetAttribute("ExclusiveOfferPurchased", excl.Value >= 1)
 	end
 
 	task.spawn(function()

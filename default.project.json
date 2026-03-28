@@ -15,6 +15,9 @@
       },
       "GamePassSyncRequest": {
         "$className": "RemoteFunction"
+      },
+      "GamePassPurchaseAnnounce": {
+        "$className": "RemoteEvent"
       }
     },
 
