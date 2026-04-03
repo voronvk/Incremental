@@ -116,6 +116,11 @@ event.OnServerEvent:Connect(function(player, cornType)
 
 		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * groupMulti * melonBoostMult)
 
+		local goldTreeP2 = upgrades:FindFirstChild("GoldTreeP2")
+		if goldTreeP2 and goldTreeP2.Value >= 1 then
+			totalValue = math.floor(totalValue * 2)
+		end
+
 		local character = player.Character
 		if character then
 			local root = character:FindFirstChild("HumanoidRootPart")
@@ -222,6 +227,11 @@ autoevent.OnServerEvent:Connect(function(player, cornType)
 		end
 
 		local totalValue = math.floor(baseValue * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * mult12 * mult13 * mult14 * mult15 * melonBoostMult)
+
+		local goldTreeP2 = upgrades:FindFirstChild("GoldTreeP2")
+		if goldTreeP2 and goldTreeP2.Value >= 1 then
+			totalValue = math.floor(totalValue * 2)
+		end
 
 		cornStat.Value += totalValue
 		collects.Value += 1

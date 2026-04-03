@@ -7,6 +7,12 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local robuxGui = script.Parent
 
+local function areOfferPopupsEnabled()
+	local settings = player:FindFirstChild("Settings")
+	local v = settings and settings:FindFirstChild("PopUpsMuted")
+	return not (v and v:IsA("ValueBase") and v.Value >= 1)
+end
+
 local ButtonScaleEffect = require(ReplicatedStorage.Shared:WaitForChild("ButtonScaleEffect"))
 
 -- Rotating products (Developer Products)
@@ -17,7 +23,7 @@ local LUCKSHOP_PRODUCT_ID = 3553201276
 -- StarterFrame: bundle grande (mismo producto que siempre)
 local EXCLUSIVE_OFFER_PRODUCT_ID = 3564690970
 -- AdvancedFrame: Rebirth x2 durante 120 min — crea este Developer Product en Creator y ajusta el ID si difiere
-local ADVANCED_OFFER_PRODUCT_ID = 3564690971
+local ADVANCED_OFFER_PRODUCT_ID = 3567514993
 local OFFER_APPEAR_SOUND_ID = "rbxassetid://99608180022223"
 -- StarterFrame: tiempos originales (40–200s primera vez, 150–300s si cierra sin comprar)
 local OFFER_FIRST_DELAY_MIN = 40
@@ -479,6 +485,9 @@ local function setupOfferFrame(
 		end
 
 		showOffer = function()
+			if not areOfferPopupsEnabled() then
+				return
+			end
 			if isPurchased() then
 				return
 			end

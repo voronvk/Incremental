@@ -22,13 +22,27 @@ buyAllRemote.OnServerEvent:Connect(function(player, ids)
 	bumpGamePassStamp(player)
 end)
 
-setMuteRequest.OnServerEvent:Connect(function(player, muted)
+setMuteRequest.OnServerEvent:Connect(function(player, a, b)
 	local settings = player:FindFirstChild("Settings")
-	if not settings then return end
+	if not settings then
+		return
+	end
+	if type(a) == "string" and (b == 0 or b == 1) then
+		if a == "MusicMuted" or a == "SfxMuted" or a == "PopUpsMuted" then
+			local nv = settings:FindFirstChild(a)
+			if nv and (nv:IsA("IntValue") or nv:IsA("NumberValue")) then
+				nv.Value = b
+			end
+		end
+		return
+	end
+	local muted = a == true
+	local value = muted and 1 or 0
 	local musicMuted = settings:FindFirstChild("MusicMuted")
 	local sfxMuted = settings:FindFirstChild("SfxMuted")
-	if not musicMuted or not sfxMuted then return end
-	local value = (muted == true) and 1 or 0
+	if not musicMuted or not sfxMuted then
+		return
+	end
 	musicMuted.Value = value
 	sfxMuted.Value = value
 end)

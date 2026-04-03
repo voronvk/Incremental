@@ -10,6 +10,7 @@ local fovTweenInfo = TweenInfo.new(FOV_TWEEN_TIME, Enum.EasingStyle.Quad, Enum.E
 local openCount = 0
 local savedFieldOfView: number? = nil
 local savedAutoHarvestEnabled: boolean? = nil
+local savedAutoTappingEnabled: boolean? = nil
 local fovTween: Tween? = nil
 
 local function getBlurEffect(): BlurEffect
@@ -56,6 +57,11 @@ local function applyOverlay()
 			savedAutoHarvestEnabled = ah.Enabled
 			ah.Enabled = false
 		end
+		local at = pg:FindFirstChild("AutoTapping")
+		if at and at:IsA("ScreenGui") then
+			savedAutoTappingEnabled = at.Enabled
+			at.Enabled = false
+		end
 	end
 end
 
@@ -77,12 +83,21 @@ local function clearOverlay()
 
 	local player = Players.LocalPlayer
 	local pg = player:FindFirstChild("PlayerGui")
-	if pg and savedAutoHarvestEnabled ~= nil then
-		local ah = pg:FindFirstChild("AutoHarvest")
-		if ah and ah:IsA("ScreenGui") then
-			ah.Enabled = savedAutoHarvestEnabled
+	if pg then
+		if savedAutoHarvestEnabled ~= nil then
+			local ah = pg:FindFirstChild("AutoHarvest")
+			if ah and ah:IsA("ScreenGui") then
+				ah.Enabled = savedAutoHarvestEnabled
+			end
+			savedAutoHarvestEnabled = nil
 		end
-		savedAutoHarvestEnabled = nil
+		if savedAutoTappingEnabled ~= nil then
+			local at = pg:FindFirstChild("AutoTapping")
+			if at and at:IsA("ScreenGui") then
+				at.Enabled = savedAutoTappingEnabled
+			end
+			savedAutoTappingEnabled = nil
+		end
 	end
 end
 

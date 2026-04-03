@@ -20,6 +20,11 @@ for _, cfg in ipairs(ENERGY_CONFIG) do
 		local upgrades = player:FindFirstChild("Upgrades")
 		if not currencies or not upgrades then return end
 
+		local upgtree2_2 = upgrades:FindFirstChild("UpgTree2_2")
+		if upgtree2_2 and upgtree2_2.Value >= 1 then
+			return
+		end
+
 		local energy = currencies:FindFirstChild("Energy")
 		local upg = upgrades:FindFirstChild(cfg.upg)
 		if not energy or not upg then return end

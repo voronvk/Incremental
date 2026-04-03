@@ -7,9 +7,9 @@ local part = workspace:WaitForChild("CountDownPart")
 local countGui = part:WaitForChild("CountGui")
 local label = countGui:WaitForChild("CountLabel")
 
--- Fecha/hora objetivo: 4 de abril 2026 a las 13:00 hora España (CEST, UTC+2).
+-- Fecha/hora objetivo: 12 de abril 2026 a las 17:00 hora España (CEST, UTC+2).
 -- Para que sea igual para todos los jugadores, lo convertimos a UTC.
-local TARGET_UNIX_UTC = DateTime.fromUniversalTime(2026, 4, 4, 11, 0, 0).UnixTimestamp
+local TARGET_UNIX_UTC = DateTime.fromUniversalTime(2026, 4, 12, 15, 0, 0).UnixTimestamp
 
 local function formatRemaining(totalSeconds: number): string
 	totalSeconds = math.max(0, math.floor(totalSeconds))

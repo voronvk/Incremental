@@ -4,6 +4,7 @@ local clearCornEvent = ReplicatedStorage:WaitForChild("ClearLocalCornEvent")
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 
 local BASE_COST = 1000
+local MIN_MELON_LEVEL_FOR_REBIRTH = 100
 
 local REBIRTHS_GAMEPASS_ID = 1740115835
 
@@ -21,6 +22,7 @@ rebirthEvent.OnServerEvent:Connect(function(player)
 	local cornValue = upgrades:FindFirstChild("CornValueUpg1")
 	local cornAmount = upgrades:FindFirstChild("CornAmountUpg1")
 	local timesRebirthed = events:FindFirstChild("TimesRebirthed")
+	local melonLevel = events and events:FindFirstChild("MelonLevel")
 
 	local rebirthValue = upgrades:FindFirstChild("RebirthValueUpg1")
 	local upgtree1 = upgrades:FindFirstChild("UpgTree1")
@@ -40,6 +42,9 @@ rebirthEvent.OnServerEvent:Connect(function(player)
 	end
 
 	if not corn or not spawnRate or not cornValue or not cornAmount then return end
+	if not melonLevel or melonLevel.Value < MIN_MELON_LEVEL_FOR_REBIRTH then
+		return
+	end
 
 	local cost = math.floor((corn.Value) / BASE_COST)
 	local mult1 = 2 ^ rebirthValue.Value
@@ -75,6 +80,11 @@ rebirthEvent.OnServerEvent:Connect(function(player)
 	if corn.Value >= cost then
 		local gain = (math.floor(corn.Value / BASE_COST) * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10 * mult11 * groupMulti * rebirthBoostMult)
 
+		local goldTreeP3 = upgrades:FindFirstChild("GoldTreeP3")
+		if goldTreeP3 and goldTreeP3.Value >= 1 then
+			gain *= 2
+		end
+
 		rebirths.Value += math.floor(gain + 0.5)
 		timesRebirthed.Value = timesRebirthed.Value + 1
 		corn.Value = 0
@@ -101,6 +111,7 @@ task.spawn(function()
 				local cornValue = upgrades:FindFirstChild("CornValueUpg1")
 				local cornAmount = upgrades:FindFirstChild("CornAmountUpg1")
 				local timesRebirthed = events:FindFirstChild("TimesRebirthed")
+				local melonLevel = events:FindFirstChild("MelonLevel")
 
 				local rebirthValue = upgrades:FindFirstChild("RebirthValueUpg1")
 				local upgtree1 = upgrades:FindFirstChild("UpgTree1")
@@ -114,8 +125,8 @@ task.spawn(function()
 				local upgtree2_9 = upgrades:FindFirstChild("UpgTree2_9")
 				local upgtree2_10 = upgrades:FindFirstChild("UpgTree2_10")
 
-				if corn and rebirths and playtime and spawnRate and cornValue and cornAmount and timesRebirthed and tier then
-					if tier.Value >= 4 then
+				if corn and rebirths and playtime and spawnRate and cornValue and cornAmount and timesRebirthed and tier and melonLevel then
+					if tier.Value >= 4 and melonLevel.Value >= MIN_MELON_LEVEL_FOR_REBIRTH then
 
 						local cost = BASE_COST
 						local rebirthBoostMult = 1
@@ -169,6 +180,11 @@ task.spawn(function()
 							gain *= rebirthBoostMult
 
 							gain /= autogain
+
+							local goldTreeP3 = upgrades:FindFirstChild("GoldTreeP3")
+							if goldTreeP3 and goldTreeP3.Value >= 1 then
+								gain *= 2
+							end
 
 							gain = math.floor(gain + 0.5)
 

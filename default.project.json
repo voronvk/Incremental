@@ -18,6 +18,33 @@
       },
       "GamePassPurchaseAnnounce": {
         "$className": "RemoteEvent"
+      },
+      "TappingTapFunction": {
+        "$className": "RemoteFunction"
+      },
+      "TappingXpBonusRequest": {
+        "$className": "RemoteEvent"
+      },
+      "TappingDamageUpgradeRequest": {
+        "$className": "RemoteEvent"
+      },
+      "TappingCritUpgradeRequest": {
+        "$className": "RemoteEvent"
+      },
+      "DailyRewardClaimRequest": {
+        "$className": "RemoteEvent"
+      },
+      "DailyRewardClaimResult": {
+        "$className": "RemoteEvent"
+      },
+      "MelonLevelSync": {
+        "$className": "RemoteEvent"
+      },
+      "GoldTreePurchaseRequest": {
+        "$className": "RemoteEvent"
+      },
+      "GoldTreePurchaseResult": {
+        "$className": "RemoteEvent"
       }
     },
 
@@ -48,6 +75,13 @@
         "$ignoreUnknownInstances": true,
         "$path": "src/StarterGui/AutoHarvest"
       },
+      "AutoTapping": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "Main": {
+          "$path": "src/StarterGui/AutoTapping/Main.client.luau"
+        }
+      },
       "BottomGui": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
@@ -72,6 +106,13 @@
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
         "$path": "src/StarterGui/ScreenGui"
+      },
+      "TappingGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "Main": {
+          "$path": "src/StarterGui/TappingGui/Main.client.luau"
+        }
       }
     },
 

@@ -40,7 +40,8 @@ local MELONSHOP_30MIN_PRODUCT_ID = 3564513610 -- x2 melones 30 min (stackea tiem
 local SPEEDSHOP_30MIN_PRODUCT_ID = 3564513530 -- x1.5 velocidad 30 min (stackea tiempo)
 
 -- AdvancedFrame: Rebirth x2 durante 120 min (Developer Product distinto al Exclusive)
-local ADVANCED_OFFER_PRODUCT_ID = 3564690971
+local ADVANCED_OFFER_PRODUCT_ID = 3567514993
+local DAILY_REWARDS_SKIP_ALL_PRODUCT_ID = 3569324327
 local ADVANCED_REBIRTH_BOOST_DURATION_SEC = 120 * 60
 
 -- Exclusive offer (StarterFrame): 180 min x2 Speed/Melon/Rebirth + 20 min all boosts +2
@@ -117,6 +118,19 @@ local cornProductValues = {
 	[CORN_PRODUCT_ID_4] = { amount = 1e12 },
 }
 
+-- Plot GoldShopBoard (Developer Products)
+local GOLD_PRODUCT_ID_5 = 3569370365
+local GOLD_PRODUCT_ID_10 = 3569372988
+local GOLD_PRODUCT_ID_20 = 3569373149
+local GOLD_PRODUCT_ID_50 = 3569373371
+
+local goldProductValues = {
+	[GOLD_PRODUCT_ID_5] = { amount = 5 },
+	[GOLD_PRODUCT_ID_10] = { amount = 10 },
+	[GOLD_PRODUCT_ID_20] = { amount = 20 },
+	[GOLD_PRODUCT_ID_50] = { amount = 50 },
+}
+
 local receiptDataStore = DataStoreService:GetDataStore("ProcessedReceipts")
 
 local function safelyGetGemeralds(player)
@@ -166,6 +180,20 @@ local function safelyGetCorn(player)
 			local corn = currencies:FindFirstChild("Corn")
 			if corn then
 				return corn
+			end
+		end
+		task.wait(0.5)
+	end
+	return nil
+end
+
+local function safelyGetGold(player)
+	for i = 1, 10 do
+		local currencies = player:FindFirstChild("Currencies")
+		if currencies then
+			local gold = currencies:FindFirstChild("Gold")
+			if gold then
+				return gold
 			end
 		end
 		task.wait(0.5)
@@ -319,6 +347,13 @@ local function processReceipt(receiptInfo)
 		end
 		corn.Value += cornProductValues[productId].amount
 
+	elseif goldProductValues[productId] then
+		local gold = safelyGetGold(player)
+		if not gold then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		gold.Value += goldProductValues[productId].amount
+
 	elseif productId == MELON_BOOST_15MIN_PRODUCT_ID then
 		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")
 		local melonMult = safelyGetBoostMultiplier(player, "MelonBoostMultiplier")
@@ -438,6 +473,18 @@ local function processReceipt(receiptInfo)
 		extendBoostEndTime(rebirthEnd, ADVANCED_REBIRTH_BOOST_DURATION_SEC)
 		player:SetAttribute("LastBoostProduct", tostring(productId))
 		player:SetAttribute("LastRebirthBoostEnd", rebirthEnd.Value)
+
+	elseif productId == DAILY_REWARDS_SKIP_ALL_PRODUCT_ID then
+		local serverFolder = game:GetService("ServerScriptService"):FindFirstChild("Server")
+		local dailyRoot = serverFolder and serverFolder:FindFirstChild("DailyRewardsGui", true)
+		local grantBf = dailyRoot and dailyRoot:FindFirstChild("GrantDailySkipAll", true)
+		if not (grantBf and grantBf:IsA("BindableFunction")) then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		local ok = grantBf:Invoke(player)
+		if not ok then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
 
 	elseif productId == EXCLUSIVE_OFFER_PRODUCT_ID then
 		local events = player:FindFirstChild("Events")

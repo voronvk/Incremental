@@ -8,6 +8,7 @@ local currencies = player:WaitForChild("Currencies")
 local events = player:WaitForChild("Events")
 local rebirths = currencies:WaitForChild("Rebirths")
 local corn = currencies:WaitForChild("Corn")
+local melonLevel = events:WaitForChild("MelonLevel")
 
 local upgradeFolder = workspace:WaitForChild("Upgrades")
 local upgradePart = upgradeFolder:WaitForChild("RebirthBoard0")
@@ -38,6 +39,7 @@ end
 
 -- CONFIG
 local RebirthCost = 1000
+local MIN_MELON_LEVEL_FOR_REBIRTH = 100
 
 -- MODULE
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
@@ -159,15 +161,13 @@ local function updateLabel()
 		"Level: "
 		.. rebirths.Value
 
-	-- BUTTON COLOR
-	if corn.Value >= cost then
-		button.BackgroundColor3 =
-			Color3.new(0, 1, 0)
+	-- BUTTON COLOR (también requiere melon nivel 100; validado en servidor)
+	local canRebirth = corn.Value >= cost and melonLevel.Value >= MIN_MELON_LEVEL_FOR_REBIRTH
+	if canRebirth then
+		button.BackgroundColor3 = Color3.new(0, 1, 0)
 	else
-		button.BackgroundColor3 =
-			Color3.new(0.35, 0.35, 0.35)
+		button.BackgroundColor3 = Color3.new(0.35, 0.35, 0.35)
 	end
-
 end
 
 -- INITIAL UPDATE
@@ -178,6 +178,7 @@ rebirths:GetPropertyChangedSignal("Value"):Connect(updateLabel)
 corn:GetPropertyChangedSignal("Value"):Connect(updateLabel)
 rebirthValue:GetPropertyChangedSignal("Value"):Connect(updateLabel)
 upgTree1:GetPropertyChangedSignal("Value"):Connect(updateLabel)
+melonLevel:GetPropertyChangedSignal("Value"):Connect(updateLabel)
 
 -- CLICK HANDLER
 local lastClickTime = 0
@@ -192,6 +193,10 @@ button.MouseButton1Click:Connect(function()
 	end
 
 	lastClickTime = currentTime
+
+	if melonLevel.Value < MIN_MELON_LEVEL_FOR_REBIRTH then
+		return
+	end
 
 	if corn.Value >= RebirthCost then
 		upgradeEvent:FireServer()

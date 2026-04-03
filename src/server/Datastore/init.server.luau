@@ -1,13 +1,16 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
+-- true = Taps + mejoras del melon/tapping no cargan ni se guardan (solo para testear en sesión)
+local SKIP_TAPPING_PERSIST = true
+
 local cornDataStore = DataStoreService:GetDataStore("JoggersCoalyThoCobsonGotTheGemmyTho")
 local SAVE_INTERVAL = 300
 local SCALE = 1e6
 local MAX_LOG = 308
 
 local currencyStats = {
-	"Corn", "Rebirths", "Gemeralds", "Clicks", "Energy",
+	"Corn", "Rebirths", "Gemeralds", "Gold", "Clicks", "Energy",
 	"CornLogged", "RebirthsLogged", "Ascensions", "BasicSeeds",
 	"SilverSeeds", "GoldenSeeds", "DiamondSeeds", "RubySeeds",
 }
@@ -29,7 +32,8 @@ local upgradeStats = {
 	"Kernel2", "Kernel3", "Kernel4", "Kernel5",
 	"UpgTree2_19", "UpgTree2_20", "UpgTree2_21", "UpgTree2_22",
 	"UpgTree2_23", "UpgTree2_24", "UpgTree2_25", "UpgTree2_26",
-	"UpgTree2_27", "UpgTree2_28", "UpgTree2_29"
+	"UpgTree2_27", "UpgTree2_28", "UpgTree2_29",
+	"GoldTreeP1", "GoldTreeP2", "GoldTreeP3", "GoldTreeP4", "GoldTreeP5", "GoldTreeP6", "GoldTreeP7",
 }
 local eventStats = {
 	"TimesRebirthed", "Island1Bought", "Playtime", "Collects",
@@ -45,14 +49,22 @@ local eventStats = {
 	"QuestLastResetTime", "QuestPlaytimeAtReset", "QuestRebirthsAtReset", "QuestMelonsCollected",
 	"QuestRewardClaimed",
 	"ExclusiveOfferPurchased",
+	"TappingXpBonus",
+	"TappingDamageLevel",
+	"TappingCritLevel",
+	"DailyRewardNextDay",
+	"DailyRewardLastClaimUnix",
+	"MelonLevel",
+	"AutoTapBasicUnlocked",
 }
 
 local settingsStats = {
-	"MusicMuted", "SfxMuted", "PlayersHidden"
+	"MusicMuted", "SfxMuted", "PopUpsMuted", "PlayersHidden"
 }
 
 local leaderstatsStats = {
-	"Level"
+	"Level",
+	"Taps",
 }
 
 local function createValues(parent, class, names)
@@ -75,7 +87,28 @@ local function loadData(player, data)
 	end
 	for _, name in ipairs(eventStats) do
 		local e = player.Events:FindFirstChild(name)
-		if e then e.Value = data[name] or 0 end
+		if e then
+			if
+				SKIP_TAPPING_PERSIST
+				and (
+					name == "TappingXpBonus"
+					or name == "TappingDamageLevel"
+					or name == "TappingCritLevel"
+				)
+			then
+				e.Value = 0
+			else
+				local v = data[name] or 0
+				if name == "DailyRewardNextDay" then
+					if v < 1 then
+						v = 1
+					elseif v > 8 then
+						v = 8
+					end
+				end
+				e.Value = v
+			end
+		end
 	end
 	for _, name in ipairs(settingsStats) do
 		local s = player.Settings:FindFirstChild(name)
@@ -83,7 +116,13 @@ local function loadData(player, data)
 	end
 	for _, name in ipairs(leaderstatsStats) do
 		local l = player.leaderstats:FindFirstChild(name)
-		if l then l.Value = data[name] or 0 end
+		if l then
+			if SKIP_TAPPING_PERSIST and name == "Taps" then
+				l.Value = 0
+			else
+				l.Value = data[name] or 0
+			end
+		end
 	end
 end
 
@@ -96,13 +135,28 @@ local function getDataToSave(player)
 		data[name] = player.Upgrades:FindFirstChild(name) and player.Upgrades[name].Value or 0
 	end
 	for _, name in ipairs(eventStats) do
-		data[name] = player.Events:FindFirstChild(name) and player.Events[name].Value or 0
+		if
+			SKIP_TAPPING_PERSIST
+			and (
+				name == "TappingXpBonus"
+				or name == "TappingDamageLevel"
+				or name == "TappingCritLevel"
+			)
+		then
+			data[name] = 0
+		else
+			data[name] = player.Events:FindFirstChild(name) and player.Events[name].Value or 0
+		end
 	end
 	for _, name in ipairs(settingsStats) do
 		data[name] = player.Settings:FindFirstChild(name) and player.Settings[name].Value or 0
 	end
 	for _, name in ipairs(leaderstatsStats) do
-		data[name] = player.leaderstats:FindFirstChild(name) and player.leaderstats[name].Value or 0
+		if SKIP_TAPPING_PERSIST and name == "Taps" then
+			data[name] = 0
+		else
+			data[name] = player.leaderstats:FindFirstChild(name) and player.leaderstats[name].Value or 0
+		end
 	end
 	return data
 end
@@ -142,6 +196,15 @@ Players.PlayerAdded:Connect(function(player)
 		loadData(player, data)
 	else
 		warn("Could not load data for", player.Name)
+	end
+
+	local drNext = player.Events:FindFirstChild("DailyRewardNextDay")
+	if drNext and drNext:IsA("NumberValue") then
+		if drNext.Value < 1 then
+			drNext.Value = 1
+		elseif drNext.Value > 8 then
+			drNext.Value = 8
+		end
 	end
 
 	local excl = player.Events:FindFirstChild("ExclusiveOfferPurchased")

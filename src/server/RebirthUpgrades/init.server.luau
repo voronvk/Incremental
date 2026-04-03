@@ -66,8 +66,8 @@ task.spawn(function()
 				local upg = upgrades:FindFirstChild(cfg.upg)
 				if upg and upg.Value < cfg.maxLevel then
 					local cost = math.floor(cfg.base * (cfg.mult ^ upg.Value))
+					-- Tier 5 autobuy: require affordable cost but do not spend rebirths
 					if rebirths.Value >= cost then
-						rebirths.Value -= cost
 						upg.Value += 1
 					end
 				end

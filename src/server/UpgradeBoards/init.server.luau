@@ -66,8 +66,8 @@ task.spawn(function()
 				local upg = upgrades:FindFirstChild(cfg.upg)
 				if upg and upg.Value < cfg.maxLevel then
 					local cost = math.floor(cfg.base * (cfg.mult ^ upg.Value))
+					-- Tier 5 autobuy: same as Generator autobuy — check balance, do not deduct corn
 					if corn.Value >= cost then
-						corn.Value -= cost
 						upg.Value += 1
 					end
 				end

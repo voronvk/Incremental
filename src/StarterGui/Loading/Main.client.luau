@@ -3,8 +3,22 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ButtonScaleEffect = require(ReplicatedStorage.Shared:WaitForChild("ButtonScaleEffect"))
+local Attr = require(ReplicatedStorage.Shared:WaitForChild("PlayerClientAttributes"))
 
 local player = Players.LocalPlayer
+
+local function hideHarvestScreenGuis()
+	local pg = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
+	local ah = pg:FindFirstChild("AutoHarvest")
+	if ah and ah:IsA("ScreenGui") then
+		ah.Enabled = false
+	end
+	local at = pg:FindFirstChild("AutoTapping")
+	if at and at:IsA("ScreenGui") then
+		at.Enabled = false
+	end
+end
+
 local function resolveLoadingGui()
 	local parent = script.Parent
 	-- ScreenGui ES un GuiObject, pero dejamos el check explícito para que sea claro.
@@ -25,8 +39,11 @@ end
 local loadingGui = resolveLoadingGui()
 if not loadingGui then
 	warn("Loading/Main: no se encontró el ScreenGui 'Loading' (script.Parent o PlayerGui).")
+	player:SetAttribute(Attr.CLIENT_LOADING_COMPLETE, true)
 	return
 end
+
+hideHarvestScreenGuis()
 
 -- Mostrar inmediatamente (cuando te unes al juego)
 if loadingGui:IsA("ScreenGui") then
@@ -163,3 +180,4 @@ elseif loadingGui:IsA("GuiObject") then
 	loadingGui.Visible = false
 end
 
+player:SetAttribute(Attr.CLIENT_LOADING_COMPLETE, true)

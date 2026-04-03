@@ -74,19 +74,26 @@ do
 	connectAll(updateRespecLabel)
 
 	local lastRespecTime, COOLDOWN = 0, 300
+	local function formatCooldownSeconds(sec: number): string
+		sec = math.max(0, math.floor(sec))
+		return string.format("Cooldown: %d:%02d", math.floor(sec / 60), sec % 60)
+	end
 	button.MouseButton1Click:Connect(function()
 		if os.time() - lastRespecTime >= COOLDOWN then
 			lastRespecTime = os.time()
 			respecevent:FireServer()
 			sound:Play()
 			button.AutoButtonColor = false
-			button.Text = "Cooldown: 5:00"
 			task.spawn(function()
-				for _ = 1, COOLDOWN do
-					task.wait(1)
+				while true do
 					local t = COOLDOWN - (os.time() - lastRespecTime)
-					if t <= 0 then button.Text = "Respec"; button.AutoButtonColor = true; break end
-					button.Text = string.format("Cooldown: %d:%02d", math.floor(t/60), t%60)
+					if t <= 0 then
+						button.Text = "Respec"
+						button.AutoButtonColor = true
+						break
+					end
+					button.Text = formatCooldownSeconds(t)
+					task.wait(1)
 				end
 			end)
 		end

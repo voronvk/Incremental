@@ -77,7 +77,9 @@ upgradeEvent.OnServerEvent:Connect(function(player)
 		end
 	end
 
-	ascensions.Value += math.floor(1 * mult * mult2 * mult3 * ascensionBoostMult)
+		local goldTree5 = upgrades:FindFirstChild("GoldTreeP5")
+		local goldTreeAscMult = (goldTree5 and goldTree5.Value >= 1) and 2 or 1
+		ascensions.Value += math.floor(1 * mult * mult2 * mult3 * ascensionBoostMult * goldTreeAscMult)
 		if timesascended then
 			timesascended.Value += 1
 		end

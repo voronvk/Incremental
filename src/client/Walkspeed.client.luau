@@ -9,6 +9,7 @@ local upgrades = player:WaitForChild("Upgrades")
 local upgTree4 = upgrades:WaitForChild("UpgTree4")
 local upgtree2_28 = upgrades:WaitForChild("UpgTree2_28")
 local upgtree2_29 = upgrades:WaitForChild("UpgTree2_29")
+local goldTreeP1 = upgrades:WaitForChild("GoldTreeP1")
 local events = player:WaitForChild("Events")
 local speedBoostEndTime = events:WaitForChild("SpeedBoostEndTime")
 local speedBoostMultiplier = events:WaitForChild("SpeedBoostMultiplier")
@@ -83,3 +84,4 @@ end
 if luckAllBoostAdd and luckAllBoostAdd:IsA("NumberValue") then
 	luckAllBoostAdd:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)
 end
+goldTreeP1:GetPropertyChangedSignal("Value"):Connect(applyWalkspeedBonus)

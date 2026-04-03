@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
+local Attr = require(ReplicatedStorage.Shared:WaitForChild("PlayerClientAttributes"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 
 local CornFinder
@@ -36,11 +37,29 @@ local WARN_COOLDOWN = 3
 local WARN_SLIDE_OFFSET = 80
 local WARN_ANIM_DURATION = 0.3
 
-if player:GetAttribute("Auto") == nil then
-	player:SetAttribute("Auto", false)
+-- Recolección en mapa (CornFinder). Nombres en ReplicatedStorage.Shared.PlayerClientAttributes.
+local ATTR_AUTO_HARVEST = Attr.AUTO_HARVEST
+local ATTR_AUTO_HARVEST_GOLD = Attr.AUTO_HARVEST_GOLD
+
+-- Legado "Auto" / "AutoGold": promover si siguen en true. Si TappingZone ya fijó AutoHarvest, no pisar con nil.
+if player:GetAttribute(Attr.LEGACY_AUTO) == true then
+	player:SetAttribute(ATTR_AUTO_HARVEST, true)
+	player:SetAttribute(Attr.LEGACY_AUTO, false)
+elseif player:GetAttribute(ATTR_AUTO_HARVEST) == nil then
+	player:SetAttribute(ATTR_AUTO_HARVEST, false)
 end
-if player:GetAttribute("AutoGold") == nil then
-	player:SetAttribute("AutoGold", false)
+if player:GetAttribute(Attr.LEGACY_AUTO_GOLD) == true then
+	player:SetAttribute(ATTR_AUTO_HARVEST_GOLD, true)
+	player:SetAttribute(Attr.LEGACY_AUTO_GOLD, false)
+elseif player:GetAttribute(ATTR_AUTO_HARVEST_GOLD) == nil then
+	player:SetAttribute(ATTR_AUTO_HARVEST_GOLD, false)
+end
+player:SetAttribute(Attr.LEGACY_AUTO, false)
+player:SetAttribute(Attr.LEGACY_AUTO_GOLD, false)
+-- Si ya estamos en zona de tapping, recolección debe ir apagada (TappingZone puede haber corrido antes).
+if player:GetAttribute(Attr.IN_TAPPING_ZONE) == true then
+	player:SetAttribute(ATTR_AUTO_HARVEST, false)
+	player:SetAttribute(ATTR_AUTO_HARVEST_GOLD, false)
 end
 
 local container = script.Parent
@@ -184,8 +203,8 @@ end
 local function updateButtonColor()
 	local canUseBasic = GROUP_ID <= 0 or player:IsInGroup(GROUP_ID)
 	local canUseGold = hasGoldPass
-	local isAuto = player:GetAttribute("Auto") == true
-	local isAutoGold = player:GetAttribute("AutoGold") == true
+	local isAuto = player:GetAttribute(ATTR_AUTO_HARVEST) == true
+	local isAutoGold = player:GetAttribute(ATTR_AUTO_HARVEST_GOLD) == true
 
 	if basicButton then
 		basicButton.ImageColor3 = (canUseBasic and isAuto) and COLOR_IMAGE_ON or COLOR_IMAGE_OFF
@@ -232,7 +251,8 @@ local function blockMovement()
 end
 
 local function updateMovementBlock()
-	if player:GetAttribute("Auto") then
+	-- En TappingZone no bloquear teclas: ahí no hay autocollect, solo auto-tap al melón (otro GUI).
+	if player:GetAttribute(ATTR_AUTO_HARVEST) == true and player:GetAttribute(Attr.IN_TAPPING_ZONE) ~= true then
 		ContextActionService:BindAction(
 			AUTO_BLOCK_ACTION,
 			blockMovement,
@@ -249,10 +269,8 @@ end
 refreshGoldPassState()
 updateButtonColor()
 updateMovementBlock()
-player:GetAttributeChangedSignal("Auto"):Connect(function()
-	updateButtonColor()
-	updateMovementBlock()
-end)
+player:GetAttributeChangedSignal(Attr.IN_TAPPING_ZONE):Connect(updateMovementBlock)
+task.defer(updateMovementBlock)
 
 local activeConnection = nil
 local savedWalkSpeed: number? = nil
@@ -281,7 +299,7 @@ local function refreshGoldWalkSpeed(humanoid: Humanoid?)
 	end
 
 	-- If we're not in Gold mode, restore and clear.
-	if player:GetAttribute("AutoGold") ~= true then
+	if player:GetAttribute(ATTR_AUTO_HARVEST_GOLD) ~= true then
 		if savedWalkSpeedHumanoid == humanoid and savedWalkSpeed ~= nil then
 			pcall(function()
 				local speedBoostMultNow = (speedBoostEndTime.Value > os.time()) and 2 or 1
@@ -324,7 +342,7 @@ local function startAutoHarvest()
 
 	activeConnection = RunService.Heartbeat:Connect(function()
 		local okLoop, err = pcall(function()
-			if not player:GetAttribute("Auto") then
+			if player:GetAttribute(ATTR_AUTO_HARVEST) ~= true then
 				stopAutoHarvest()
 				return
 			end
@@ -337,6 +355,18 @@ local function startAutoHarvest()
 			local humanoid = character:FindFirstChild("Humanoid")
 			local rootPart = character:FindFirstChild("HumanoidRootPart")
 			if not humanoid or not rootPart or humanoid.Health <= 0 then
+				return
+			end
+
+			-- En TappingZone el ScreenGui se oculta pero este script sigue vivo: no mover al jugador
+			-- (AutoTapping solo simula taps al melón; sin esto seguiría CornFinder/MoveTo).
+			if player:GetAttribute(Attr.IN_TAPPING_ZONE) == true then
+				if savedWalkSpeedHumanoid and savedWalkSpeed ~= nil then
+					pcall(function()
+						local speedBoostMultNow = (speedBoostEndTime.Value > os.time()) and 2 or 1
+						savedWalkSpeedHumanoid.WalkSpeed = (savedWalkSpeed :: number) * speedBoostMultNow
+					end)
+				end
 				return
 			end
 
@@ -390,17 +420,20 @@ local function startAutoHarvest()
 	end)
 end
 
-player:GetAttributeChangedSignal("Auto"):Connect(function()
-	if player:GetAttribute("Auto") then
+local function onAutoHarvestAttributeChanged()
+	updateButtonColor()
+	updateMovementBlock()
+	if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
 		task.defer(startAutoHarvest)
 	else
 		stopAutoHarvest()
 	end
-end)
+end
+player:GetAttributeChangedSignal(ATTR_AUTO_HARVEST):Connect(onAutoHarvestAttributeChanged)
 
-player:GetAttributeChangedSignal("AutoGold"):Connect(function()
-	-- If Auto is currently running, adjust speed immediately when toggling Gold mode.
-	if player:GetAttribute("Auto") == true then
+player:GetAttributeChangedSignal(ATTR_AUTO_HARVEST_GOLD):Connect(function()
+	-- If harvest auto is running, adjust speed immediately when toggling Gold mode.
+	if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
 		local character = player.Character
 		local humanoid = character and character:FindFirstChild("Humanoid") :: Humanoid?
 		refreshGoldWalkSpeed(humanoid)
@@ -420,12 +453,12 @@ player:GetAttributeChangedSignal("AutoGold"):Connect(function()
 end)
 
 player.CharacterAdded:Connect(function()
-	if player:GetAttribute("Auto") then
+	if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
 		task.defer(startAutoHarvest)
 	end
 end)
 
-if player:GetAttribute("Auto") then
+if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
 	task.defer(startAutoHarvest)
 end
 
@@ -508,9 +541,9 @@ local function bindFrameButton(button, state, onClick)
 	button.MouseButton1Click:Connect(onClick)
 end
 
-local function setAutoMode(isAuto: boolean, isGold: boolean)
-	player:SetAttribute("Auto", isAuto)
-	player:SetAttribute("AutoGold", isGold)
+local function setAutoHarvestMode(isAuto: boolean, isGold: boolean)
+	player:SetAttribute(ATTR_AUTO_HARVEST, isAuto)
+	player:SetAttribute(ATTR_AUTO_HARVEST_GOLD, isGold)
 end
 
 bindFrameButton(basicButton, basicState, function()
@@ -518,10 +551,10 @@ bindFrameButton(basicButton, basicState, function()
 		playWarn()
 		return
 	end
-	if player:GetAttribute("Auto") == true then
-		setAutoMode(false, false)
+	if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
+		setAutoHarvestMode(false, false)
 	else
-		setAutoMode(true, false)
+		setAutoHarvestMode(true, false)
 	end
 end)
 
@@ -533,10 +566,10 @@ bindFrameButton(goldButton, goldState, function()
 		end)
 		return
 	end
-	if player:GetAttribute("Auto") == true then
-		setAutoMode(false, false)
+	if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
+		setAutoHarvestMode(false, false)
 	else
-		setAutoMode(true, true)
+		setAutoHarvestMode(true, true)
 	end
 end)
 
@@ -547,8 +580,6 @@ if goldUnlock and goldUnlock:IsA("GuiObject") then
 		end
 	end)
 end
-
-player:GetAttributeChangedSignal("Auto"):Connect(updateButtonColor)
 
 player:GetAttributeChangedSignal("GamePassSyncStamp"):Connect(function()
 	refreshGoldPassState()

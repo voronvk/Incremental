@@ -73,8 +73,8 @@ task.spawn(function()
 					local surcharge = (tier and tier.Value >= 1) and 25 or 1
 					local cost = math.floor(cfg.base * (cfg.mult ^ upg.Value) * surcharge)
 
+					-- Autobuy matches GeneratorPurchase: require affordable cost but do not spend clicks
 					if clicks.Value >= cost then
-						clicks.Value -= cost
 						upg.Value += 1
 					end
 				end
