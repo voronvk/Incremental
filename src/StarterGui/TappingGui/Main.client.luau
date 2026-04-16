@@ -7,6 +7,15 @@ local SoundService = game:GetService("SoundService")
 local player = Players.LocalPlayer
 local gui = script.Parent
 
+local Attr = require(ReplicatedStorage.Shared:WaitForChild("PlayerClientAttributes"))
+if gui:IsA("ScreenGui") then
+	local function syncTappingGuiWithLoad()
+		gui.Enabled = player:GetAttribute(Attr.CLIENT_LOADING_COMPLETE) == true
+	end
+	syncTappingGuiWithLoad()
+	player:GetAttributeChangedSignal(Attr.CLIENT_LOADING_COMPLETE):Connect(syncTappingGuiWithLoad)
+end
+
 local ButtonScaleEffect = require(ReplicatedStorage.Shared:WaitForChild("ButtonScaleEffect"))
 local UIBlur = require(ReplicatedStorage.Shared:WaitForChild("UIBlur"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
@@ -82,6 +91,15 @@ if dailyRewardsModal then
 	uiScale.Parent = dailyRewardsModal
 	dailyRewardsModal.Visible = false
 	frameData["DailyRewards"] = { frame = dailyRewardsModal, uiScale = uiScale, isOpen = false }
+end
+
+local indexModal = framesFolder and framesFolder:FindFirstChild("Index")
+if indexModal then
+	local uiScale = indexModal:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	uiScale.Scale = 0
+	uiScale.Parent = indexModal
+	indexModal.Visible = false
+	frameData["Index"] = { frame = indexModal, uiScale = uiScale, isOpen = false }
 end
 
 -- Si `Store` / `Quests` / `BoostButton` son ya ImageButton o TextButton, se usa ese Instance.
@@ -160,6 +178,7 @@ if buttonsRoot then
 	if left then
 		wireOpener(left:FindFirstChild("Quests"), "QuestFrame")
 		wireOpener(left:FindFirstChild("Gifts"), "DailyRewards")
+		wireOpener(left:FindFirstChild("Index"), "Index")
 	end
 end
 wireOpener(gui:FindFirstChild("BoostButton"), "BoostShop")
@@ -477,6 +496,28 @@ if dailyRewardsModal and dailyRewardsData then
 		skipAll.Activated:Connect(function()
 			MarketplaceService:PromptProductPurchase(player, DAILY_SKIP_ALL_PRODUCT_ID)
 		end)
+	end
+end
+
+-- Index (Frames.Index): Top.Main.Close
+local indexData = frameData["Index"]
+if indexModal and indexData then
+	local top = indexModal:FindFirstChild("Top")
+	local main = top and top:FindFirstChild("Main")
+	-- Busca recursivo por si `Close` no es hijo directo
+	local closeIndex = main and main:FindFirstChild("Close", true)
+	if closeIndex then
+		local img = closeIndex:FindFirstChild("ImageLabel")
+		ButtonScaleEffect.applyScaleEffect(closeIndex, img or closeIndex)
+		if closeIndex:IsA("GuiButton") then
+			closeIndex.Activated:Connect(function()
+				closeFrame(indexData)
+			end)
+		else
+			closeIndex.MouseButton1Click:Connect(function()
+				closeFrame(indexData)
+			end)
+		end
 	end
 end
 

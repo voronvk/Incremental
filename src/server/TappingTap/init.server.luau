@@ -7,7 +7,7 @@ local CritConfig = require(ReplicatedStorage.Shared:WaitForChild("TappingCritCon
 local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 
-local MIN_LEVEL = 15
+local MIN_LEVEL = 25
 
 local rng = Random.new()
 
@@ -84,6 +84,21 @@ fn.OnServerInvoke = function(player)
 	if GamePassCheck.playerOwnsGamePass(player, GamePassConfig.TAPPING_MULTIPLE_CLICK_GAMEPASS_ID) then
 		tapsAdded = math.max(1, math.floor(tapsAdded * 5))
 	end
+
+	-- Runes: multiplican los ingresos del minijuego de tapping:
+	-- - tapsAdded => "Tapping"
+	-- - xpGain => "Melons" (progreso de melon)
+	local runeMultTapping = player:GetAttribute("RunesIncomeMultiplier_Tapping")
+	if type(runeMultTapping) ~= "number" or runeMultTapping <= 0 then
+		runeMultTapping = 1
+	end
+	local runeMultMelons = player:GetAttribute("RunesIncomeMultiplier_Melons")
+	if type(runeMultMelons) ~= "number" or runeMultMelons <= 0 then
+		runeMultMelons = 1
+	end
+
+	tapsAdded = math.max(1, math.floor(tapsAdded * runeMultTapping))
+	xpGain = math.max(1, math.floor(xpGain * runeMultMelons))
 
 	tapsStat.Value += tapsAdded
 

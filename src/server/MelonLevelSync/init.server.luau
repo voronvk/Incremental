@@ -2,26 +2,43 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local FloodCheck = require(ServerScriptService.Server:WaitForChild("RemoteFloodCheck") :: ModuleScript)
+local MelonCfg = require(ReplicatedStorage.Shared:WaitForChild("MelonProgressConfig"))
 
 local syncEvent = ReplicatedStorage:WaitForChild("MelonLevelSync")
-local MAX_MELON_LEVEL = 100
 
-syncEvent.OnServerEvent:Connect(function(player, level)
+syncEvent.OnServerEvent:Connect(function(player, level, xpOpt)
 	if type(level) ~= "number" then
 		return
 	end
-	if not FloodCheck:Check(player, syncEvent, 40) then
+	-- Debounce en cliente + subida en level-up; límite alto para no perder XP
+	if not FloodCheck:Check(player, syncEvent, 200) then
 		return
 	end
 
 	local events = player:FindFirstChild("Events")
-	local melonLevel = events and events:FindFirstChild("MelonLevel")
+	if not events then
+		return
+	end
+
+	local melonLevel = events:FindFirstChild("MelonLevel")
 	if not melonLevel or not (melonLevel:IsA("IntValue") or melonLevel:IsA("NumberValue")) then
 		return
 	end
 
-	local L = math.clamp(math.floor(level + 0), 0, MAX_MELON_LEVEL)
-	if L > melonLevel.Value then
-		melonLevel.Value = L
+	local melonXp = events:FindFirstChild("MelonXp")
+	if not melonXp or not (melonXp:IsA("IntValue") or melonXp:IsA("NumberValue")) then
+		melonXp = Instance.new("NumberValue")
+		melonXp.Name = "MelonXp"
+		melonXp.Value = 0
+		melonXp.Parent = events
 	end
+
+	local xpIn = 0
+	if type(xpOpt) == "number" then
+		xpIn = xpOpt
+	end
+
+	local L, x = MelonCfg.normalizeLevelXp(level, xpIn)
+	melonLevel.Value = L
+	melonXp.Value = x
 end)

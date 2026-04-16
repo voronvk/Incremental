@@ -4,7 +4,7 @@ local event = ReplicatedStorage:WaitForChild("TappingXpBonusRequest")
 local FloodCheck = require(game.ServerScriptService.Server:WaitForChild("RemoteFloodCheck") :: ModuleScript)
 local Config = require(ReplicatedStorage.Shared:WaitForChild("TappingXpBonusConfig"))
 
-local MIN_LEVEL = 15
+local MIN_LEVEL = 25
 
 event.OnServerEvent:Connect(function(player, mode)
 	if not FloodCheck:Check(player, event, 12) then

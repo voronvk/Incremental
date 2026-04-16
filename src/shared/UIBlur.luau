@@ -101,7 +101,7 @@ local function clearOverlay()
 	end
 end
 
--- Refcount: efectos solo 0→1 y 1→0 (no se acumula FOV ni blur)
+-- Refcount: effects only transition 0→1 and 1→0 (FOV/blur do not stack)
 local function beginModal()
 	openCount += 1
 	if openCount == 1 then

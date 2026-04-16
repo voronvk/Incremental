@@ -1,7 +1,8 @@
 --[[
-	Plot.RebirthBoard.(Bisplay|Display).SurfaceGui.FrameList:
-	- AmountLabel: "Rebirths: X" (TimesRebirthed, datastore)
-	- RebirthFrame / ButtonFrame / Rebirth: requiere Melon nivel 100 + maíz mínimo para renacer.
+	Rebirth en la PARCELA de Tapping (no RebirthBoard0 de Upgrades).
+	Ruta: workspace.ClientTapping.<jugador>/Plot/RebirthBoard → …
+	Reglas: RebirthRules.PlotRebirthBoard + PlotRebirthEvent.
+	Rebirth pide maíz (Currencies.Corn), no los "+Taps" del melón.
 ]]
 
 local Players = game:GetService("Players")
@@ -15,10 +16,12 @@ local corn = currencies:WaitForChild("Corn")
 local timesRebirthed = events:WaitForChild("TimesRebirthed")
 local melonLevel = events:WaitForChild("MelonLevel")
 
-local rebirthEvent = ReplicatedStorage:WaitForChild("RebirthEvent")
+local RebirthRules = require(ReplicatedStorage.Shared:WaitForChild("RebirthRules"))
+local plotRules = RebirthRules.PlotRebirthBoard
+local plotRebirthEvent = ReplicatedStorage:WaitForChild("PlotRebirthEvent")
 
-local MIN_MELON_LEVEL = 100
-local REBIRTH_MIN_CORN = 1000
+local MIN_MELON_LEVEL = plotRules.MinMelonLevel
+local REBIRTH_MIN_CORN = plotRules.MinCorn
 
 local COLOR_LOCKED = Color3.fromRGB(58, 58, 58)
 local COLOR_READY = Color3.fromRGB(255, 75, 252)
@@ -117,7 +120,8 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 	local DEBOUNCE = 5
 
 	local function canRebirth(): boolean
-		return melonLevel.Value >= MIN_MELON_LEVEL and corn.Value >= REBIRTH_MIN_CORN
+		local melonOk = MIN_MELON_LEVEL <= 0 or melonLevel.Value >= MIN_MELON_LEVEL
+		return melonOk and corn.Value >= REBIRTH_MIN_CORN
 	end
 
 	local function updateAmount()
@@ -135,7 +139,16 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 			btnLabel.Text = "Rebirth!"
 			btnLabel.TextSize = 47
 		else
-			btnLabel.Text = "Reach Level 100 for Rebirth."
+			if MIN_MELON_LEVEL > 0 and melonLevel.Value < MIN_MELON_LEVEL then
+				btnLabel.Text = ("Melon %d/%d for Rebirth."):format(math.floor(melonLevel.Value), MIN_MELON_LEVEL)
+			elseif corn.Value < REBIRTH_MIN_CORN then
+				btnLabel.Text = ("Corn: need %d (have %s). Not taps/melons."):format(
+					REBIRTH_MIN_CORN,
+					tostring(math.floor(corn.Value))
+				)
+			else
+				btnLabel.Text = "Can't rebirth yet."
+			end
 			btnLabel.TextSize = 23
 		end
 	end
@@ -160,11 +173,11 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 			return
 		end
 		lastClickTime = now
-		rebirthEvent:FireServer()
+		plotRebirthEvent:FireServer()
 		playRebirthSound()
 	end
 
-	if rebirthBtn:IsA("TextButton") or rebirthBtn:IsA("ImageButton") then
+	if rebirthBtn:IsA("GuiButton") then
 		rebirthBtn.Activated:Connect(onClick)
 	end
 end

@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
 
 local player = game.Players.LocalPlayer
 local upgrades = player:WaitForChild("Upgrades")
@@ -63,6 +64,109 @@ local pickupRange = 2.5
 
 local COLLECT_SOUND_ID = "rbxassetid://140206660137491"
 local COLLECT_SOUND_VOLUME = 0.4
+
+-- Salida al recoger (Melons / maíz): sube 1 stud y funde a invisible antes de destruir.
+local COLLECT_FLOAT_STUDS = 1
+local COLLECT_FLOAT_DURATION = 0.55
+local COLLECT_FLOAT_EASING = TweenInfo.new(
+	COLLECT_FLOAT_DURATION,
+	Enum.EasingStyle.Quad,
+	Enum.EasingDirection.Out
+)
+
+local function prepPartsCollectVfx(root: Instance): { BasePart }
+	local parts: { BasePart } = {}
+	for _, d in root:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanTouch = false
+			d.CanQuery = false
+			d.Anchored = true
+			table.insert(parts, d)
+		end
+	end
+	return parts
+end
+
+local function tweenCollectExitThenDestroy(root: Instance)
+	if not root.Parent then
+		return
+	end
+
+	if root:IsA("BasePart") then
+		local p = root
+		p.CanCollide = false
+		p.CanTouch = false
+		p.CanQuery = false
+		p.Anchored = true
+		local startCf = p.CFrame
+		local goalCf = startCf + Vector3.new(0, COLLECT_FLOAT_STUDS, 0)
+		local tw = TweenService:Create(p, COLLECT_FLOAT_EASING, { CFrame = goalCf, Transparency = 1 })
+		tw.Completed:Connect(function()
+			if root.Parent then
+				root:Destroy()
+			end
+		end)
+		tw:Play()
+		return
+	end
+
+	if not root:IsA("Model") then
+		root:Destroy()
+		return
+	end
+
+	local model = root :: Model
+	local parts = prepPartsCollectVfx(model)
+	if #parts == 0 then
+		model:Destroy()
+		return
+	end
+
+	local okPivot, startPivot = pcall(function()
+		return model:GetPivot()
+	end)
+	if not okPivot or typeof(startPivot) ~= "CFrame" then
+		model:Destroy()
+		return
+	end
+
+	local goalPivot = startPivot + Vector3.new(0, COLLECT_FLOAT_STUDS, 0)
+	local baseTransparency: { [BasePart]: number } = {}
+	for _, p in parts do
+		baseTransparency[p] = p.Transparency
+	end
+
+	local alpha = Instance.new("NumberValue")
+	alpha.Name = "CollectExitAlpha"
+	alpha.Value = 0
+	alpha.Parent = model
+
+	local conn: RBXScriptConnection? = nil
+	conn = alpha.Changed:Connect(function()
+		local t = alpha.Value
+		pcall(function()
+			model:PivotTo(startPivot:Lerp(goalPivot, t))
+		end)
+		for p, bt in baseTransparency do
+			if p.Parent then
+				p.Transparency = math.clamp(bt + (1 - bt) * t, 0, 1)
+			end
+		end
+	end)
+
+	local tw = TweenService:Create(alpha, COLLECT_FLOAT_EASING, { Value = 1 })
+	tw.Completed:Connect(function()
+		if conn then
+			conn:Disconnect()
+			conn = nil
+		end
+		if model.Parent then
+			model:Destroy()
+		end
+	end)
+	tw:Play()
+end
 
 local function isSfxMuted(): boolean
 	local settings = player:FindFirstChild("Settings")
@@ -192,9 +296,9 @@ RunService.Heartbeat:Connect(function()
 			local cXZ = Vector2.new(corn.PrimaryPart.Position.X, corn.PrimaryPart.Position.Z)
 			if (pXZ - cXZ).Magnitude <= range then
 				collectEvent:FireServer(corn.Name)
-				corn:Destroy()
 				table.remove(myCorn, i)
 				playCollectSound()
+				tweenCollectExitThenDestroy(corn)
 			end
 		end
 	end
@@ -209,8 +313,8 @@ task.spawn(function()
 			local corn = myCorn[idx]
 			if corn and corn.PrimaryPart then
 				collectEventAuto:FireServer(corn.Name)
-				corn:Destroy()
 				table.remove(myCorn, idx)
+				tweenCollectExitThenDestroy(corn)
 			end
 		end
 	end

@@ -13,7 +13,6 @@ local claimResult = ReplicatedStorage:WaitForChild("DailyRewardClaimResult")
 
 local DAY_SECONDS = 86400
 
-local CORN_DAY1 = 100_000
 local MELON_BOOST_SEC = 20 * 60
 local REBIRTH_BOOST_SEC = 20 * 60
 local SPEED_BOOST_SEC = 15 * 60
@@ -78,12 +77,9 @@ local function getBoostMult(player, name)
 end
 
 local function grantRewardForDay(player, dayIndex)
-	local currencies = player:FindFirstChild("Currencies")
-	local corn = currencies and currencies:FindFirstChild("Corn")
 	if dayIndex == 1 then
-		if corn and corn:IsA("NumberValue") then
-			corn.Value += CORN_DAY1
-		end
+		-- Día 1: sin recompensa (solo marca progreso del calendario).
+		return
 	elseif dayIndex == 2 then
 		local e = getBoostEnd(player, "MelonBoostEndTime")
 		local m = getBoostMult(player, "MelonBoostMultiplier")

@@ -6,7 +6,30 @@ local RunService = game:GetService("RunService")
 
 local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 local announce = ReplicatedStorage:WaitForChild("GamePassPurchaseAnnounce")
+local dailyGuiClientNotify = ReplicatedStorage:WaitForChild("DailyGuiClientNotify")
 local PRODUCT_DISPLAY_NAMES = GamePassConfig.DEVELOPER_PRODUCT_DISPLAY_NAMES or {}
+
+-- Lazy-load: avoid WaitForChild("DailyGui") at require time (load order / missing folder = infinite yield).
+local dailyGuiServiceCached = nil
+local function getDailyGuiService()
+	if dailyGuiServiceCached ~= nil then
+		return dailyGuiServiceCached
+	end
+	local folder = script.Parent.Parent:FindFirstChild("DailyGui")
+	if not folder then
+		return nil
+	end
+	local mod = folder:FindFirstChild("Service")
+	if not mod or not mod:IsA("ModuleScript") then
+		return nil
+	end
+	local ok, svc = pcall(require, mod)
+	if not ok or type(svc) ~= "table" then
+		return nil
+	end
+	dailyGuiServiceCached = svc
+	return svc
+end
 
 local function displayNameForProduct(productId)
 	local n = PRODUCT_DISPLAY_NAMES[productId]
@@ -42,6 +65,7 @@ local SPEEDSHOP_30MIN_PRODUCT_ID = 3564513530 -- x1.5 velocidad 30 min (stackea 
 -- AdvancedFrame: Rebirth x2 durante 120 min (Developer Product distinto al Exclusive)
 local ADVANCED_OFFER_PRODUCT_ID = 3567514993
 local DAILY_REWARDS_SKIP_ALL_PRODUCT_ID = 3569324327
+local DAILY_GUI_DOUBLE_PRODUCT_ID = 3571431653
 local ADVANCED_REBIRTH_BOOST_DURATION_SEC = 120 * 60
 
 -- Exclusive offer (StarterFrame): 180 min x2 Speed/Melon/Rebirth + 20 min all boosts +2
@@ -70,12 +94,17 @@ local function extendBoostEndTime(numberValue, durationSeconds)
 	end
 end
 
--- Gemerald product IDs
+-- Gemerald / Crystals (Developer Products). IDs viejos + los de gemboard0GUI.client.luau
 local GEM_PRODUCT_ID_1 = 3461625487
 local GEM_PRODUCT_ID_2 = 3461625810
 local GEM_PRODUCT_ID_3 = 3461626222
 local GEM_PRODUCT_ID_4 = 3461626520
 local GEM_PRODUCT_ID_5 = 3461627003
+local GEM_BOARD_PRODUCT_ID_1 = 3552350900
+local GEM_BOARD_PRODUCT_ID_2 = 3552351508
+local GEM_BOARD_PRODUCT_ID_3 = 3552351505
+local GEM_BOARD_PRODUCT_ID_4 = 3552352195
+local GEM_BOARD_PRODUCT_ID_5 = 3552352193
 
 -- RobuxDonated product IDs
 local ROBUX_PRODUCT_ID_1 = 3461636278
@@ -98,6 +127,11 @@ local gemProductValues = {
 	[GEM_PRODUCT_ID_3] = { amount = 100 },
 	[GEM_PRODUCT_ID_4] = { amount = 250 },
 	[GEM_PRODUCT_ID_5] = { amount = 1000 },
+	[GEM_BOARD_PRODUCT_ID_1] = { amount = 10 },
+	[GEM_BOARD_PRODUCT_ID_2] = { amount = 25 },
+	[GEM_BOARD_PRODUCT_ID_3] = { amount = 100 },
+	[GEM_BOARD_PRODUCT_ID_4] = { amount = 250 },
+	[GEM_BOARD_PRODUCT_ID_5] = { amount = 1000 },
 }
 
 local robuxProductValues = {
@@ -307,7 +341,8 @@ end
 local function processReceipt(receiptInfo)
 	local userId = tonumber(receiptInfo.PlayerId) or receiptInfo.PlayerId
 	local purchaseId = receiptInfo.PurchaseId
-	local productId = tonumber(receiptInfo.ProductId)
+	local rawProductId = receiptInfo.ProductId
+	local productId = type(rawProductId) == "number" and rawProductId or tonumber(rawProductId)
 
 	local success, alreadyProcessed = pcall(function()
 		return receiptDataStore:GetAsync(purchaseId)
@@ -485,6 +520,22 @@ local function processReceipt(receiptInfo)
 		if not ok then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+
+	elseif productId == DAILY_GUI_DOUBLE_PRODUCT_ID then
+		local DailyGuiService = getDailyGuiService()
+		if not DailyGuiService then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		local ok = DailyGuiService.tryDoublePurchaseClaim(player)
+		if not ok then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		pcall(function()
+			dailyGuiClientNotify:FireClient(
+				player,
+				"[Daily] Double reward claimed! Speed x2 for 10 minutes. Next claim in 24 hours."
+			)
+		end)
 
 	elseif productId == EXCLUSIVE_OFFER_PRODUCT_ID then
 		local events = player:FindFirstChild("Events")

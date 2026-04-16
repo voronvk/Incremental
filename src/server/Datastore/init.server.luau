@@ -1,8 +1,8 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
--- true = Taps + mejoras del melon/tapping no cargan ni se guardan (solo para testear en sesión)
-local SKIP_TAPPING_PERSIST = true
+-- true = no persistir taps ni niveles de tienda tapping (solo pruebas locales). false = producción.
+local SKIP_TAPPING_PERSIST = false
 
 local cornDataStore = DataStoreService:GetDataStore("JoggersCoalyThoCobsonGotTheGemmyTho")
 local SAVE_INTERVAL = 300
@@ -10,7 +10,7 @@ local SCALE = 1e6
 local MAX_LOG = 308
 
 local currencyStats = {
-	"Corn", "Rebirths", "Gemeralds", "Gold", "Clicks", "Energy",
+	"Corn", "Rebirths", "Gemeralds", "Gold", "Clicks", "Energy", "Keys",
 	"CornLogged", "RebirthsLogged", "Ascensions", "BasicSeeds",
 	"SilverSeeds", "GoldenSeeds", "DiamondSeeds", "RubySeeds",
 }
@@ -54,8 +54,15 @@ local eventStats = {
 	"TappingCritLevel",
 	"DailyRewardNextDay",
 	"DailyRewardLastClaimUnix",
+	"DailyGuiLastClaimUnix",
 	"MelonLevel",
+	"MelonXp",
 	"AutoTapBasicUnlocked",
+}
+
+-- Stats string (no numericos) que tambien se persisten.
+local runeInventoryStats = {
+	"RunesInventoryJson", -- JSON encode del inventario { [runeId] = count }
 }
 
 local settingsStats = {
@@ -67,11 +74,20 @@ local leaderstatsStats = {
 	"Taps",
 }
 
-local function createValues(parent, class, names)
+local function createValues(parent, class, names, defaultValue)
 	for _, name in ipairs(names) do
 		local val = Instance.new(class)
 		val.Name = name
-		val.Value = 0
+		if defaultValue ~= nil then
+			val.Value = defaultValue
+		else
+			-- Defaults seguros para los tipos que usamos aqui.
+			if class == "StringValue" then
+				val.Value = ""
+			else
+				val.Value = 0
+			end
+		end
 		val.Parent = parent
 	end
 end
@@ -110,6 +126,20 @@ local function loadData(player, data)
 			end
 		end
 	end
+
+	-- Runes inventory (JSON)
+	for _, name in ipairs(runeInventoryStats) do
+		local e = player.Events:FindFirstChild(name)
+		if e and e:IsA("StringValue") then
+			local v = data[name]
+			if type(v) == "string" and v ~= "" then
+				e.Value = v
+			else
+				e.Value = "{}"
+			end
+		end
+	end
+
 	for _, name in ipairs(settingsStats) do
 		local s = player.Settings:FindFirstChild(name)
 		if s then s.Value = data[name] or 0 end
@@ -148,6 +178,13 @@ local function getDataToSave(player)
 			data[name] = player.Events:FindFirstChild(name) and player.Events[name].Value or 0
 		end
 	end
+
+	for _, name in ipairs(runeInventoryStats) do
+		data[name] =
+			player.Events:FindFirstChild(name) and player.Events[name].Value
+			or "{}"
+	end
+
 	for _, name in ipairs(settingsStats) do
 		data[name] = player.Settings:FindFirstChild(name) and player.Settings[name].Value or 0
 	end
@@ -185,6 +222,7 @@ Players.PlayerAdded:Connect(function(player)
 	createValues(currencies, "NumberValue", currencyStats)
 	createValues(upgrades, "NumberValue", upgradeStats)
 	createValues(events, "NumberValue", eventStats)
+	createValues(events, "StringValue", runeInventoryStats, "{}")
 	createValues(settingsFolder, "NumberValue", settingsStats)
 	createValues(leaderstats, "NumberValue", leaderstatsStats)
 
@@ -211,6 +249,8 @@ Players.PlayerAdded:Connect(function(player)
 	if excl and excl:IsA("NumberValue") then
 		player:SetAttribute("ExclusiveOfferPurchased", excl.Value >= 1)
 	end
+
+	player:SetAttribute("PlayerDataLoaded", true)
 
 	task.spawn(function()
 		while player.Parent do

@@ -27,23 +27,39 @@ local REWARD_POP_EXTRA_MULT = 1.65
 local REWARD_TEXTSIZE_MULT = 1.75
 local VFX_DURATION = 0.35
 
--- Progresión melon (local): primeros niveles más rápidos, curva un poco más suave que 2.5 fijo
-local MELON_XP_GOAL_START = 8
-local MELON_XP_GOAL_MULT = 2.38
-local MELON_MAX_LEVEL = 100
-local MELON_SCALE_PER_LEVEL = 0.05
 local BAR_TWEEN_INFO = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 local player = Players.LocalPlayer
 local Attr = require(ReplicatedStorage.Shared:WaitForChild("PlayerClientAttributes"))
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
+local MelonCfg = require(ReplicatedStorage.Shared:WaitForChild("MelonProgressConfig"))
 local tappingTapFunction = ReplicatedStorage:WaitForChild("TappingTapFunction")
 local MelonAutoTapBridge = require(ReplicatedStorage.Shared:WaitForChild("MelonAutoTapBridge"))
 local melonLevelSync = ReplicatedStorage:WaitForChild("MelonLevelSync")
 
-local function pushMelonLevelToServer(level: number)
-	pcall(function()
-		melonLevelSync:FireServer(level)
+local latestPushLevel, latestPushXp = 1, 0
+local debouncePushThread: thread? = nil
+
+local function pushMelonProgressToServer(level: number, xp: number, urgent: boolean?)
+	latestPushLevel, latestPushXp = level, xp
+	if urgent then
+		if debouncePushThread then
+			task.cancel(debouncePushThread)
+			debouncePushThread = nil
+		end
+		pcall(function()
+			melonLevelSync:FireServer(latestPushLevel, latestPushXp)
+		end)
+		return
+	end
+	if debouncePushThread then
+		return
+	end
+	debouncePushThread = task.delay(0.22, function()
+		debouncePushThread = nil
+		pcall(function()
+			melonLevelSync:FireServer(latestPushLevel, latestPushXp)
+		end)
 	end)
 end
 
@@ -237,7 +253,7 @@ local function tweenLifeBar(state, fraction)
 end
 
 local function refreshLifeBar(state)
-	if state.level >= MELON_MAX_LEVEL then
+	if state.level >= MelonCfg.MAX_LEVEL then
 		tweenLifeBar(state, 1)
 		return
 	end
@@ -250,20 +266,20 @@ local function refreshLifeBar(state)
 end
 
 local function addMelonXp(melon: Model, state, amount)
-	if state.level >= MELON_MAX_LEVEL then
-		pushMelonLevelToServer(state.level)
+	if state.level >= MelonCfg.MAX_LEVEL then
+		pushMelonProgressToServer(state.level, state.xp, true)
 		return
 	end
 
 	state.xp += amount
 
 	local levelsGained = 0
-	while state.level < MELON_MAX_LEVEL and state.xp >= state.goalXp do
+	while state.level < MelonCfg.MAX_LEVEL and state.xp >= state.goalXp do
 		state.xp -= state.goalXp
-		state.goalXp *= MELON_XP_GOAL_MULT
 		state.level += 1
+		state.goalXp = MelonCfg.goalXpForLevel(state.level)
 		levelsGained += 1
-		state.displayScale += MELON_SCALE_PER_LEVEL
+		state.displayScale += MelonCfg.SCALE_PER_LEVEL
 		applyMelonScale(melon, state.displayScale)
 		setLifeLabel(state)
 	end
@@ -271,17 +287,17 @@ local function addMelonXp(melon: Model, state, amount)
 		playLevelUpSound()
 	end
 
-	if state.level >= MELON_MAX_LEVEL then
+	if state.level >= MelonCfg.MAX_LEVEL then
 		state.xp = 0
 		tweenLifeBar(state, 1)
 		setLifeLabel(state)
-		pushMelonLevelToServer(state.level)
+		pushMelonProgressToServer(state.level, state.xp, true)
 		return
 	end
 
 	setLifeLabel(state)
 	refreshLifeBar(state)
-	pushMelonLevelToServer(state.level)
+	pushMelonProgressToServer(state.level, state.xp, levelsGained > 0)
 end
 
 local function resolveMelonLevelUi(melon: Model)
@@ -423,11 +439,34 @@ local function bindMelon(melon: Model)
 		lifeYOffset = life.Size.Y.Offset
 	end
 
+	local tData = os.clock()
+	while player:GetAttribute("PlayerDataLoaded") ~= true and os.clock() - tData < 8 do
+		task.wait(0.05)
+	end
+
+	local eventsFolder = player:WaitForChild("Events", 30)
+	local savedLevel = 1
+	local savedXp = 0
+	if eventsFolder then
+		local ml = eventsFolder:WaitForChild("MelonLevel", 15)
+		local mx = eventsFolder:WaitForChild("MelonXp", 15)
+		if ml and ml:IsA("ValueBase") then
+			savedLevel = ml.Value
+		end
+		if mx and mx:IsA("ValueBase") then
+			savedXp = mx.Value
+		end
+	end
+	local initLevel, initXp = MelonCfg.normalizeLevelXp(savedLevel, savedXp)
+	local initGoal = MelonCfg.goalXpForLevel(initLevel)
+	local displayScale = startScale + (initLevel - 1) * MelonCfg.SCALE_PER_LEVEL
+	applyMelonScale(melon, displayScale)
+
 	local state = {
-		displayScale = startScale,
-		level = 1,
-		xp = 0,
-		goalXp = MELON_XP_GOAL_START,
+		displayScale = displayScale,
+		level = initLevel,
+		xp = initXp,
+		goalXp = initGoal,
 		life = life,
 		lifeLabel = lifeLabel,
 		lifeYScale = lifeYScale,
@@ -437,7 +476,12 @@ local function bindMelon(melon: Model)
 
 	setLifeLabel(state)
 	if life then
-		life.Size = UDim2.new(0, 0, state.lifeYScale, state.lifeYOffset)
+		if state.level >= MelonCfg.MAX_LEVEL then
+			life.Size = UDim2.new(1, 0, state.lifeYScale, state.lifeYOffset)
+		else
+			life.Size = UDim2.new(0, 0, state.lifeYScale, state.lifeYOffset)
+			refreshLifeBar(state)
+		end
 	end
 
 	local tapCooldownUntil = 0
@@ -483,7 +527,7 @@ local function bindMelon(melon: Model)
 		end
 	end
 
-	pushMelonLevelToServer(state.level)
+	pushMelonProgressToServer(state.level, state.xp, true)
 end
 
 local function trySetupTapping(root)

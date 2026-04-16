@@ -37,13 +37,31 @@
       "DailyRewardClaimResult": {
         "$className": "RemoteEvent"
       },
+      "DailyGuiFreeClaimRequest": {
+        "$className": "RemoteEvent"
+      },
+      "DailyGuiFreeClaimResult": {
+        "$className": "RemoteEvent"
+      },
+      "DailyGuiClientNotify": {
+        "$className": "RemoteEvent"
+      },
       "MelonLevelSync": {
+        "$className": "RemoteEvent"
+      },
+      "RebirthEvent": {
+        "$className": "RemoteEvent"
+      },
+      "PlotRebirthEvent": {
         "$className": "RemoteEvent"
       },
       "GoldTreePurchaseRequest": {
         "$className": "RemoteEvent"
       },
       "GoldTreePurchaseResult": {
+        "$className": "RemoteEvent"
+      },
+      "UnlockIsland1Event": {
         "$className": "RemoteEvent"
       }
     },
@@ -92,6 +110,11 @@
         "$ignoreUnknownInstances": true,
         "$path": "src/StarterGui/DisplayGui"
       },
+      "DailyGUI": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterGui/DailyGUI"
+      },
       "NewsGui": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
@@ -102,6 +125,10 @@
         "$ignoreUnknownInstances": true,
         "$path": "src/StarterGui/RobuxGui"
       },
+      "RuneGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true
+      },
       "ScreenGui": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
@@ -109,6 +136,9 @@
       },
       "TappingGui": {
         "$className": "ScreenGui",
+        "$properties": {
+          "Enabled": false
+        },
         "$ignoreUnknownInstances": true,
         "Main": {
           "$path": "src/StarterGui/TappingGui/Main.client.luau"
