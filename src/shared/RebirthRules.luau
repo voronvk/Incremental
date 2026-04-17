@@ -1,16 +1,16 @@
--- Reglas distintas: RebirthBoard0 (Upgrades / maíz) vs parcela Tapping (Plot / melón).
--- Ajusta aquí; cliente y servidor leen lo mismo.
+-- Dos prestigios independientes (no mezclar monedas ni resets):
+-- - UpgradesRebirthBoard: RebirthBoard0 — maíz → moneda **Rebirths**; reset solo maíz/upgrades de maíz (RebirthEvent).
+--   No usa el melón del minijuego de tapping (Events.MelonLevel es solo tapping).
+-- - PlotRebirthBoard: parcela tapping — melón minijuego nivel mínimo → moneda **TappingRebirths** (+1 fijo por ahora);
+--   reset solo taps / melón tapping / upgrades de tienda tapping (PlotRebirthEvent).
 return {
-	-- Tablero del mundo principal (workspace.Upgrades.RebirthBoard0): rebirth por maíz, sin exigir melón.
 	UpgradesRebirthBoard = {
-		MinMelonLevel = 0,
 		MinCorn = 1000,
 		CornChunkSize = 1000,
 	},
-	-- Parcela Tapping: aquí sí tiene sentido exigir nivel de melón (progresión del tap).
 	PlotRebirthBoard = {
 		MinMelonLevel = 100,
-		MinCorn = 1000,
-		CornChunkSize = 1000,
+		-- Ganancia fija por prestigio tapping (futuros boosts del juego pueden leer este valor o otra config).
+		TappingRebirthGainFixed = 1,
 	},
 }

@@ -1,15 +1,13 @@
 --[[
-	CriticFrame: hasta 25 niveles; sube probabilidad de crítico (x5 taps + XP en ese hit).
+	CriticFrame: hasta 25 niveles; sube probabilidad de critico (x5 taps + XP en ese hit).
 ]]
 
 local M = {}
 
 M.MAX_LEVEL = 25
-M.START_COST = 380
--- Barato al principio; últimos niveles más caros (sigue siendo lateral vs damage)
-M.COST_MULT = 1.122
+M.START_COST = 140
+M.COST_MULT = 1.078
 M.CRIT_MULT = 5
--- Probabilidad por nivel (lineal, tope 40% al máximo)
 M.CHANCE_PER_LEVEL = 0.016
 M.MAX_CRIT_CHANCE = 0.4
 

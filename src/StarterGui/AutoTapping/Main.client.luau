@@ -16,6 +16,7 @@ local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassCo
 
 local AUTOTAP_GAMEPASS_ID = GamePassConfig.AUTOTAP_GAMEPASS_ID
 local UNLOCK_WARN_TEXT = "Unlock it on FreeRewards or with Gamepass!"
+local ATTR_RUNE_UNBOXING = "RuneUnboxingActive"
 
 local COLOR_IMAGE_ON = Color3.fromRGB(255, 255, 255)
 local COLOR_IMAGE_OFF = Color3.fromRGB(127, 127, 127)
@@ -328,11 +329,19 @@ local function bindFrameButton(button, state, onClick)
 end
 
 local function setAutoTapMode(isOn, isGold)
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true and isOn then
+		isOn = false
+		isGold = false
+	end
 	player:SetAttribute(Attr.AUTO_TAP, isOn)
 	player:SetAttribute(Attr.AUTO_TAP_GOLD, isGold)
 end
 
 bindFrameButton(basicButton, basicState, function()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		setAutoTapMode(false, false)
+		return
+	end
 	if not hasBasicAccess() then
 		pendingBasicPrompt = true
 		MarketplaceService:PromptGamePassPurchase(player, AUTOTAP_GAMEPASS_ID)
@@ -346,6 +355,10 @@ bindFrameButton(basicButton, basicState, function()
 end)
 
 bindFrameButton(goldButton, goldState, function()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		setAutoTapMode(false, false)
+		return
+	end
 	if not hasAutoTapPass then
 		pendingGoldPrompt = true
 		MarketplaceService:PromptGamePassPurchase(player, AUTOTAP_GAMEPASS_ID)
@@ -380,6 +393,13 @@ player:GetAttributeChangedSignal("GamePassSyncStamp"):Connect(function()
 end)
 
 autoTapBasicUnlocked:GetPropertyChangedSignal("Value"):Connect(function()
+	updateButtonColor()
+end)
+
+player:GetAttributeChangedSignal(ATTR_RUNE_UNBOXING):Connect(function()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		setAutoTapMode(false, false)
+	end
 	updateButtonColor()
 end)
 

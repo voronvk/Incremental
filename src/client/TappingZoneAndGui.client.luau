@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local Attr = require(ReplicatedStorage.Shared:WaitForChild("PlayerClientAttributes"))
+local ATTR_RUNE_UNBOXING = "RuneUnboxingActive"
 
 local ZONE_NAME = "TappingZone"
 local TITLE_IN_ZONE = "Zone: Tapping"
@@ -76,11 +77,46 @@ local function updateSlowModeTitle(inZone)
 	end
 end
 
+local function isRuneUiOpen(): boolean
+	local pg = player:FindFirstChild("PlayerGui")
+	if not pg then
+		return false
+	end
+	local runeGui = pg:FindFirstChild("RuneGui")
+	if not (runeGui and runeGui:IsA("ScreenGui")) then
+		return false
+	end
+	local basicFrame = runeGui:FindFirstChild("BasicRune", true)
+	if basicFrame and basicFrame:IsA("GuiObject") and basicFrame.Visible then
+		return true
+	end
+	local goldFrame = runeGui:FindFirstChild("GoldRune", true)
+	if goldFrame and goldFrame:IsA("GuiObject") and goldFrame.Visible then
+		return true
+	end
+	local openFrame = runeGui:FindFirstChild("Frame1", true)
+	if openFrame and openFrame:IsA("GuiObject") and openFrame.Visible then
+		return true
+	end
+	return false
+end
+
 local function updateHarvestGuis(inZone)
 	local pg = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
 	local ah = pg:FindFirstChild("AutoHarvest")
 	local at = pg:FindFirstChild("AutoTapping")
+	local inRuneUnboxing = player:GetAttribute(ATTR_RUNE_UNBOXING) == true
+	local runeUiOpen = isRuneUiOpen()
 	if player:GetAttribute(Attr.CLIENT_LOADING_COMPLETE) ~= true then
+		if ah and ah:IsA("ScreenGui") then
+			ah.Enabled = false
+		end
+		if at and at:IsA("ScreenGui") then
+			at.Enabled = false
+		end
+		return
+	end
+	if inRuneUnboxing or runeUiOpen then
 		if ah and ah:IsA("ScreenGui") then
 			ah.Enabled = false
 		end
@@ -105,6 +141,9 @@ local function refreshHarvestGuisAfterLoading()
 end
 
 player:GetAttributeChangedSignal(Attr.CLIENT_LOADING_COMPLETE):Connect(refreshHarvestGuisAfterLoading)
+player:GetAttributeChangedSignal(ATTR_RUNE_UNBOXING):Connect(function()
+	updateHarvestGuis(player:GetAttribute(Attr.IN_TAPPING_ZONE) == true)
+end)
 task.defer(refreshHarvestGuisAfterLoading)
 
 local lastZoneState = nil
@@ -130,8 +169,9 @@ local function tickZone()
 			player:SetAttribute(Attr.AUTO_TAP_GOLD, false)
 		end
 		updateSlowModeTitle(inZone)
-		updateHarvestGuis(inZone)
 	end
+	-- Forzar cada tick para que ningún otro script lo deje visible mientras RuneGui está abierta.
+	updateHarvestGuis(inZone)
 end
 
 RunService.Heartbeat:Connect(tickZone)

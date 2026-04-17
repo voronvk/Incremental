@@ -165,6 +165,17 @@ local goldProductValues = {
 	[GOLD_PRODUCT_ID_50] = { amount = 50 },
 }
 
+-- Rune keys shop (Developer Products)
+local KEYS_PRODUCT_ID_50 = 3577038716
+local KEYS_PRODUCT_ID_500 = 3577038852
+local KEYS_PRODUCT_ID_10K = 3577038971
+
+local keysProductValues = {
+	[KEYS_PRODUCT_ID_50] = { amount = 50 },
+	[KEYS_PRODUCT_ID_500] = { amount = 500 },
+	[KEYS_PRODUCT_ID_10K] = { amount = 10000 },
+}
+
 local receiptDataStore = DataStoreService:GetDataStore("ProcessedReceipts")
 
 local function safelyGetGemeralds(player)
@@ -228,6 +239,20 @@ local function safelyGetGold(player)
 			local gold = currencies:FindFirstChild("Gold")
 			if gold then
 				return gold
+			end
+		end
+		task.wait(0.5)
+	end
+	return nil
+end
+
+local function safelyGetKeys(player)
+	for i = 1, 10 do
+		local currencies = player:FindFirstChild("Currencies")
+		if currencies then
+			local keys = currencies:FindFirstChild("Keys")
+			if keys then
+				return keys
 			end
 		end
 		task.wait(0.5)
@@ -388,6 +413,13 @@ local function processReceipt(receiptInfo)
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
 		gold.Value += goldProductValues[productId].amount
+
+	elseif keysProductValues[productId] then
+		local keys = safelyGetKeys(player)
+		if not keys then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		keys.Value += keysProductValues[productId].amount
 
 	elseif productId == MELON_BOOST_15MIN_PRODUCT_ID then
 		local melonEnd = safelyGetBoostEndTime(player, "MelonBoostEndTime")

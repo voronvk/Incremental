@@ -1,10 +1,15 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
+local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 
 -- Keys: nueva moneda (player.Currencies.Keys)
 -- Objetivo: 5 Keys por 60s, entregadas al TERMINAR el ciclo (cuando se llena la barra).
 local CYCLE_SECONDS = 60
 local KEYS_PER_CYCLE = 5
+local X2_KEYS_GAMEPASS_ID = GamePassConfig.RUNE_X2_KEYS_GAMEPASS_ID or 1795970950
 
 local function getKeysValue(player: Player): NumberValue?
 	local currencies = player:FindFirstChild("Currencies")
@@ -46,7 +51,11 @@ local function startKeyLoop(player: Player)
 		elapsed += 1
 
 		if elapsed >= CYCLE_SECONDS then
-			keysVal.Value += KEYS_PER_CYCLE
+			local gain = KEYS_PER_CYCLE
+			if GamePassCheck.playerOwnsGamePass(player, X2_KEYS_GAMEPASS_ID) then
+				gain *= 2
+			end
+			keysVal.Value += gain
 			elapsed = 0
 		end
 	end

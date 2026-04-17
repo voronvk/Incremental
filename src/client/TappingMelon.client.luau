@@ -31,7 +31,6 @@ local BAR_TWEEN_INFO = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDir
 
 local player = Players.LocalPlayer
 local Attr = require(ReplicatedStorage.Shared:WaitForChild("PlayerClientAttributes"))
-local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 local MelonCfg = require(ReplicatedStorage.Shared:WaitForChild("MelonProgressConfig"))
 local tappingTapFunction = ReplicatedStorage:WaitForChild("TappingTapFunction")
 local MelonAutoTapBridge = require(ReplicatedStorage.Shared:WaitForChild("MelonAutoTapBridge"))
@@ -237,35 +236,49 @@ local function setLifeLabel(state)
 	end
 end
 
-local function tweenLifeBar(state, fraction)
+local function cancelLifeBarTween(state)
+	if state.lifeBarTween then
+		state.lifeBarTween:Cancel()
+		state.lifeBarTween = nil
+	end
+end
+
+-- instant: sin tween (subida de nivel o sync servidor); evita parpadeos de la barra.
+local function setLifeBarFraction(state, fraction, instant)
 	local life = state.life
 	if not life then
 		return
 	end
 	local p = math.clamp(fraction, 0, 1)
-	if state.lifeBarTween then
-		state.lifeBarTween:Cancel()
-		state.lifeBarTween = nil
-	end
+	cancelLifeBarTween(state)
 	local targetSize = UDim2.new(p, 0, state.lifeYScale, state.lifeYOffset)
-	state.lifeBarTween = TweenService:Create(life, BAR_TWEEN_INFO, { Size = targetSize })
-	state.lifeBarTween:Play()
+	if instant then
+		life.Size = targetSize
+	else
+		state.lifeBarTween = TweenService:Create(life, BAR_TWEEN_INFO, { Size = targetSize })
+		state.lifeBarTween:Play()
+	end
 end
 
-local function refreshLifeBar(state)
+local function tweenLifeBar(state, fraction)
+	setLifeBarFraction(state, fraction, false)
+end
+
+local function refreshLifeBar(state, instant)
+	local useInstant = instant == true
 	if state.level >= MelonCfg.MAX_LEVEL then
-		tweenLifeBar(state, 1)
+		setLifeBarFraction(state, 1, useInstant)
 		return
 	end
 	local g = state.goalXp
 	if g <= 0 then
-		tweenLifeBar(state, 0)
+		setLifeBarFraction(state, 0, true)
 		return
 	end
-	tweenLifeBar(state, state.xp / g)
+	setLifeBarFraction(state, state.xp / g, useInstant)
 end
 
-local function addMelonXp(melon: Model, state, amount)
+local function addMelonXp(melon, state, amount)
 	if state.level >= MelonCfg.MAX_LEVEL then
 		pushMelonProgressToServer(state.level, state.xp, true)
 		return
@@ -289,18 +302,19 @@ local function addMelonXp(melon: Model, state, amount)
 
 	if state.level >= MelonCfg.MAX_LEVEL then
 		state.xp = 0
-		tweenLifeBar(state, 1)
+		setLifeBarFraction(state, 1, true)
 		setLifeLabel(state)
 		pushMelonProgressToServer(state.level, state.xp, true)
 		return
 	end
 
 	setLifeLabel(state)
-	refreshLifeBar(state)
+	-- Al subir nivel la meta de XP cambia: mejor actualizar la barra al instante.
+	refreshLifeBar(state, levelsGained > 0)
 	pushMelonProgressToServer(state.level, state.xp, levelsGained > 0)
 end
 
-local function resolveMelonLevelUi(melon: Model)
+local function resolveMelonLevelUi(melon)
 	local base = melon:FindFirstChild("Base")
 	if not base then
 		return nil, nil
@@ -321,15 +335,7 @@ local function resolveMelonLevelUi(melon: Model)
 	return life, lifeLabel
 end
 
-local function formatTapPopupAmount(amount)
-	local n = math.floor(amount)
-	if n >= 100000 then
-		return Abbreviate(n)
-	end
-	return tostring(n)
-end
-
-local function showRewardPopup(melon, amount, isCrit)
+local function showRewardPopup(melon, _amount, _isCrit)
 	local billboard = melon:FindFirstChild("BillboardGui")
 	if not billboard or not billboard:IsA("BillboardGui") then
 		return
@@ -348,12 +354,8 @@ local function showRewardPopup(melon, amount, isCrit)
 
 	pop.Visible = true
 	if pop:IsA("TextLabel") or pop:IsA("TextButton") then
-		local amtStr = formatTapPopupAmount(amount)
-		if isCrit then
-			pop.Text = (amount == 1) and "+1 Tap (critical!)" or ("+%s Taps (critical!)"):format(amtStr)
-		else
-			pop.Text = (amount == 1) and "+1 Tap" or ("+%s Taps"):format(amtStr)
-		end
+		-- Texto fijo (sin cantidad); el servidor sigue sumando los taps reales.
+		pop.Text = "+Tap"
 		if not pop.TextScaled and pop.TextSize > 0 then
 			pop.TextSize = math.floor(pop.TextSize * REWARD_TEXTSIZE_MULT)
 		end
@@ -410,7 +412,7 @@ local function showRewardPopup(melon, amount, isCrit)
 	end)
 end
 
-local function bindMelon(melon: Model)
+local function bindMelon(melon)
 	if melon:GetAttribute("TappingMelonBound") then
 		return
 	end
@@ -439,17 +441,28 @@ local function bindMelon(melon: Model)
 		lifeYOffset = life.Size.Y.Offset
 	end
 
+	-- DataStore puede tardar; si leemos melón antes, queda nivel 1/0 aunque el save tenga progreso.
 	local tData = os.clock()
-	while player:GetAttribute("PlayerDataLoaded") ~= true and os.clock() - tData < 8 do
+	while player:GetAttribute("PlayerDataLoaded") ~= true and os.clock() - tData < 45 do
 		task.wait(0.05)
 	end
 
 	local eventsFolder = player:WaitForChild("Events", 30)
 	local savedLevel = 1
 	local savedXp = 0
+	local ml = nil
+	local mx = nil
 	if eventsFolder then
-		local ml = eventsFolder:WaitForChild("MelonLevel", 15)
-		local mx = eventsFolder:WaitForChild("MelonXp", 15)
+		ml = eventsFolder:WaitForChild("MelonLevel", 20)
+		mx = eventsFolder:WaitForChild("MelonXp", 20)
+		if ml and ml:IsA("ValueBase") then
+			savedLevel = ml.Value
+		end
+		if mx and mx:IsA("ValueBase") then
+			savedXp = mx.Value
+		end
+		-- Un frame extra: a veces el valor replica justo después de PlayerDataLoaded.
+		task.wait()
 		if ml and ml:IsA("ValueBase") then
 			savedLevel = ml.Value
 		end
@@ -477,11 +490,48 @@ local function bindMelon(melon: Model)
 	setLifeLabel(state)
 	if life then
 		if state.level >= MelonCfg.MAX_LEVEL then
-			life.Size = UDim2.new(1, 0, state.lifeYScale, state.lifeYOffset)
+			setLifeBarFraction(state, 1, true)
 		else
-			life.Size = UDim2.new(0, 0, state.lifeYScale, state.lifeYOffset)
-			refreshLifeBar(state)
+			refreshLifeBar(state, true)
 		end
+	end
+
+	-- Servidor puede resetear melón (rebirth) o aplicar normalize distinto al debounce del cliente.
+	-- Debounce + sin poner ancho a 0: evita parpadeos y peleas con el tween del tap.
+	if ml and ml:IsA("ValueBase") and mx and mx:IsA("ValueBase") then
+		local reconcileToken = 0
+		local function scheduleReconcileFromServer()
+			reconcileToken = reconcileToken + 1
+			local token = reconcileToken
+			task.defer(function()
+				if token ~= reconcileToken then
+					return
+				end
+				local L, x = MelonCfg.normalizeLevelXp(ml.Value, mx.Value)
+				if
+					L == state.level
+					and math.abs(x - state.xp) < 0.5
+					and state.level < MelonCfg.MAX_LEVEL
+				then
+					return
+				end
+				local levelChanged = L ~= state.level
+				local xpDropped = x + 2 < state.xp
+				state.level = L
+				state.xp = x
+				state.goalXp = MelonCfg.goalXpForLevel(L)
+				state.displayScale = startScale + (L - 1) * MelonCfg.SCALE_PER_LEVEL
+				applyMelonScale(melon, state.displayScale)
+				setLifeLabel(state)
+				if state.level >= MelonCfg.MAX_LEVEL then
+					setLifeBarFraction(state, 1, true)
+				else
+					refreshLifeBar(state, levelChanged or xpDropped)
+				end
+			end)
+		end
+		ml:GetPropertyChangedSignal("Value"):Connect(scheduleReconcileFromServer)
+		mx:GetPropertyChangedSignal("Value"):Connect(scheduleReconcileFromServer)
 	end
 
 	local tapCooldownUntil = 0

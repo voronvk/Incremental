@@ -5,6 +5,10 @@ local Players = game:GetService("Players")
 local Random = Random
 
 local RunesConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("RunesConfig"))
+local GamePassCheck = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GamePassCheck"))
+local GamePassConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GamePassConfig"))
+
+local MYTHIC_HUNTER_GAMEPASS_ID = GamePassConfig.RUNE_MYTHIC_HUNTER_GAMEPASS_ID or 1798929641
 
 local rng = Random.new()
 
@@ -129,31 +133,90 @@ local function getCountsCopy(counts)
 	return out
 end
 
-local function pickWeightedRune()
+local function getWeightedRunesForPlayer(player: Player?, category: string?)
+	local weighted = {}
 	local total = 0
-	for _, runeDef in ipairs(RunesConfig.Runes) do
+	local hasMythicHunter = false
+	if player and player:IsA("Player") then
+		hasMythicHunter = GamePassCheck.playerOwnsGamePass(player, MYTHIC_HUNTER_GAMEPASS_ID)
+	end
+
+	local rarestIndex = nil
+	local rarestWeight = math.huge
+	local highestWeightIndex = nil
+	local highestWeight = -math.huge
+
+	for idx, runeDef in ipairs(RunesConfig.Runes) do
+		local runeCategory = runeDef.Category
+		if category and category ~= "" and runeCategory ~= category then
+			continue
+		end
 		local w = tonumber(runeDef.Chance) or 0
-		if w > 0 then
-			total += w
+		local entry = {
+			runeDef = runeDef,
+			weight = math.max(0, w),
+		}
+		table.insert(weighted, entry)
+		if entry.weight > 0 then
+			total += entry.weight
+		end
+		if entry.weight > 0 and entry.weight < rarestWeight then
+			rarestWeight = entry.weight
+			rarestIndex = idx
+		end
+		if entry.weight > highestWeight then
+			highestWeight = entry.weight
+			highestWeightIndex = idx
+		end
+	end
+
+	-- +1 punto porcentual absoluto para la más rara de la categoría (restando de la más común).
+	if hasMythicHunter and rarestIndex and highestWeightIndex then
+		weighted[rarestIndex].weight += 1
+		if highestWeightIndex ~= rarestIndex and weighted[highestWeightIndex].weight > 0 then
+			weighted[highestWeightIndex].weight = math.max(0, weighted[highestWeightIndex].weight - 1)
+		end
+	end
+
+	return weighted
+end
+
+local function pickWeightedRune(player: Player?, category: string?)
+	local weighted = getWeightedRunesForPlayer(player, category)
+	local total = 0
+	for _, entry in ipairs(weighted) do
+		if entry.weight > 0 then
+			total += entry.weight
 		end
 	end
 
 	if total <= 0 then
+		for _, runeDef in ipairs(RunesConfig.Runes) do
+			if not category or category == "" or runeDef.Category == category then
+				return runeDef
+			end
+		end
 		return RunesConfig.Runes[1]
 	end
 
 	local roll = rng:NextNumber(0, total)
 	local acc = 0
-	for _, runeDef in ipairs(RunesConfig.Runes) do
-		local w = tonumber(runeDef.Chance) or 0
+	for _, entry in ipairs(weighted) do
+		local w = entry.weight
 		if w > 0 then
 			acc += w
 			if roll <= acc then
-				return runeDef
+				return entry.runeDef
 			end
 		end
 	end
 
+	for i = #weighted, 1, -1 do
+		local entry = weighted[i]
+		if entry and entry.runeDef then
+			return entry.runeDef
+		end
+	end
 	return RunesConfig.Runes[#RunesConfig.Runes]
 end
 
@@ -170,8 +233,8 @@ function M.getInventorySummary(player)
 	}
 end
 
-function M.rollRandomRuneId()
-	local runeDef = pickWeightedRune()
+function M.rollRandomRuneId(player: Player?, category: string?)
+	local runeDef = pickWeightedRune(player, category)
 	return runeDef and runeDef.Id or nil
 end
 
@@ -209,8 +272,8 @@ function M.grantRuneById(player, runeId)
 	}
 end
 
-function M.grantRandomRune(player)
-	local runeId = M.rollRandomRuneId()
+function M.grantRandomRune(player, category: string?)
+	local runeId = M.rollRandomRuneId(player, category)
 	if not runeId then
 		return { ok = false, reason = "no_runes_defined" }
 	end

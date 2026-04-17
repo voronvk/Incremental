@@ -34,6 +34,10 @@ return {
 	BOOST_PACK_GAMEPASS_ID = 1783936373,
 	-- Better Luck: reservado (sin efecto de gameplay aún); sync + tienda
 	BETTER_LUCK_GAMEPASS_ID = 1783996506,
+	-- Rune gamepasses
+	RUNE_MYTHIC_HUNTER_GAMEPASS_ID = 1798929641, -- +1% probabilidad absoluta para Legendary
+	RUNE_X2_KEYS_GAMEPASS_ID = 1795970950, -- x2 llaves por ciclo del sistema de runas
+	RUNE_FAST_OPEN_GAMEPASS_ID = 1799822625, -- apertura de runas 1.5x mas rapida
 
 	-- IDs que concede el bundle Everything (además del propio bundle)
 	BUNDLE_EVERYTHING_GRANT_IDS = {
@@ -68,6 +72,9 @@ return {
 		1784068395,
 		1783936373,
 		1783996506,
+		1798929641,
+		1795970950,
+		1799822625,
 	},
 
 	GAMEPASS_DISPLAY_NAMES = {
@@ -86,6 +93,9 @@ return {
 		[1784068395] = "Multiple Clicks",
 		[1783936373] = "Boost Pack",
 		[1783996506] = "Better Luck",
+		[1798929641] = "Mythic Hunter",
+		[1795970950] = "x2 Keys",
+		[1799822625] = "Fast Open",
 	},
 
 	DEVELOPER_PRODUCT_DISPLAY_NAMES = {

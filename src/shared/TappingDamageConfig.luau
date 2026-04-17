@@ -1,17 +1,16 @@
 --[[
-	DamageFrame: multiplicador de taps / XP por nivel (máx. 500).
-	Early: x2 por nivel un poco más largo y costes más bajos; late: coste y poder con más peso.
+	DamageFrame: multiplicador de taps / XP (max 100 niveles).
+	Antes: 2^L en early => pocos niveles multiplicaban miles de veces y rompian melón/coste.
+	Ahora: PER_LEVEL_MULT^L (~+9.8% por nivel) => sube fuerte al final pero no explota al principio.
 ]]
 
 local M = {}
 
-M.MAX_LEVEL = 500
-M.START_COST = 32
-M.COST_MULT = 1.19
-
--- Tras este exponente en 2^x, el resto crece con porcentaje suave (más barato de calcular y acotado).
-M.DOUBLE_STEPS = 28
-M.POST_DOUBLE_MULT = 1.012
+M.MAX_LEVEL = 100
+M.START_COST = 52
+M.COST_MULT = 1.033
+-- ~2.5x a nivel 10, ~6.5x a nivel 20, ~120x a nivel 50, ~14kx a nivel 100 (vs millones con 2^L).
+M.PER_LEVEL_MULT = 1.098
 M.MULT_CAP = 1e12
 
 function M.costForNextLevel(currentLevel)
@@ -23,12 +22,11 @@ end
 
 function M.tapDamageMultiplier(level)
 	local L = math.clamp(math.floor(level), 0, M.MAX_LEVEL)
-	if L <= M.DOUBLE_STEPS then
-		return math.min(2 ^ L, M.MULT_CAP)
+	local m = M.PER_LEVEL_MULT ^ L
+	if m ~= m or m == math.huge then
+		return M.MULT_CAP
 	end
-	local base = 2 ^ M.DOUBLE_STEPS
-	local extra = L - M.DOUBLE_STEPS
-	return math.min(base * (M.POST_DOUBLE_MULT ^ extra), M.MULT_CAP)
+	return math.min(m, M.MULT_CAP)
 end
 
 return M

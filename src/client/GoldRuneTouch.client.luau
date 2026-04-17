@@ -1,5 +1,5 @@
--- BasicRuneTouch.client.luau
--- Abre/cierra la UI RuneGui.Frames.BasicRune al tocar el modelo Workspace.BasicRune.
+-- GoldRuneTouch.client.luau
+-- Abre/cierra RuneGui.Frames.GoldRune al tocar Workspace.Tapping.GoldRune.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,20 +19,48 @@ local function ensureUIScale(guiObject: Instance): UIScale
 	return uiScale
 end
 
-local runeModel = workspace:WaitForChild("BasicRune")
+local clientTapping = workspace:FindFirstChild("ClientTapping") or workspace:WaitForChild("ClientTapping", 60)
+if not clientTapping then
+	warn("[GoldRuneTouch] No existe Workspace.ClientTapping.")
+	return
+end
 
--- UI (en PlayerGui)
+local tappingFolder = clientTapping:FindFirstChild("tapping")
+	or clientTapping:FindFirstChild("Tapping")
+	or clientTapping:WaitForChild("tapping", 60)
+	or clientTapping:WaitForChild("Tapping", 60)
+if not tappingFolder then
+	warn("[GoldRuneTouch] No existe Workspace.ClientTapping.tapping.")
+	return
+end
+
+local runeModel = tappingFolder:FindFirstChild("GoldRune")
+if not runeModel then
+	runeModel = tappingFolder:FindFirstChild("GoldRune", true)
+end
+if not runeModel then
+	runeModel = tappingFolder:WaitForChild("GoldRune", 60)
+end
+if not runeModel then
+	warn("[GoldRuneTouch] No existe Workspace.ClientTapping.tapping.GoldRune.")
+	return
+end
+
 local playerGui = player:WaitForChild("PlayerGui")
 local runeGui = playerGui:WaitForChild("RuneGui")
 local frames = runeGui:WaitForChild("Frames")
-local basicRuneFrame = frames:WaitForChild("BasicRune")
-local tappingGui = playerGui:FindFirstChild("TappingGui")
+local goldRuneFrame = frames:WaitForChild("GoldRune", 60)
+if not goldRuneFrame then
+	warn("[GoldRuneTouch] No existe RuneGui.Frames.GoldRune.")
+	return
+end
 
-local uiScale = ensureUIScale(basicRuneFrame)
-basicRuneFrame.Visible = false
+local tappingGui = playerGui:FindFirstChild("TappingGui")
+local uiScale = ensureUIScale(goldRuneFrame)
+goldRuneFrame.Visible = false
 uiScale.Scale = 0
 
-local BLUR_NAME = "BasicRuneBlur"
+local BLUR_NAME = "GoldRuneBlur"
 local BLUR_SIZE_OPEN = 16
 local FOV_OPEN_DELTA = -8
 local FOV_TWEEN_IN = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -107,7 +135,6 @@ local function setTappingGuiForRuneUi(runeUiOpen: boolean)
 	if runeUiOpen then
 		tappingGui.Enabled = false
 	else
-		-- Evita quedar atascado en false por solapes de estados.
 		tappingGui.Enabled = true
 	end
 end
@@ -165,7 +192,7 @@ local function hideUI()
 
 	t.Completed:Connect(function()
 		if id == tweenId then
-			basicRuneFrame.Visible = false
+			goldRuneFrame.Visible = false
 		end
 	end)
 end
@@ -199,7 +226,7 @@ local function showUI()
 	tweenId += 1
 	local id = tweenId
 
-	basicRuneFrame.Visible = true
+	goldRuneFrame.Visible = true
 	setTappingGuiForRuneUi(true)
 	applyOpenVisuals()
 	TweenService:Create(
@@ -208,16 +235,15 @@ local function showUI()
 		{ Scale = 1 }
 	):Play()
 
-	-- Asegura estado final si hay solapes de tween.
 	task.spawn(function()
 		local ok, err = pcall(function()
 			task.wait(0.18)
 			if id == tweenId then
-				basicRuneFrame.Visible = true
+				goldRuneFrame.Visible = true
 			end
 		end)
 		if not ok then
-			warn("[BasicRuneTouch] showUI tween wait failed:", err)
+			warn("[GoldRuneTouch] showUI tween wait failed:", err)
 		end
 	end)
 	startProximityWatch()
@@ -256,11 +282,11 @@ local function onTouchExit(otherPart: Instance)
 
 	touchingCharParts[otherPart] = nil
 	touchCount -= 1
-	if touchCount < 0 then touchCount = 0 end
+	if touchCount < 0 then
+		touchCount = 0
+	end
 
-	-- Si ya no tocas el modelo, la UI debe desaparecer.
 	if touchCount == 0 then
-		-- Pequeno delay para evitar cierre instantaneo por flicker de fisicas.
 		task.delay(0.08, function()
 			if touchCount == 0 then
 				hideUI()
@@ -276,7 +302,6 @@ player.CharacterAdded:Connect(function(newCharacter)
 	hideUI()
 end)
 
--- Conectamos Touched/TouchEnded a TODOS los BaseParts del modelo.
 local runeParts = {}
 for _, desc in ipairs(runeModel:GetDescendants()) do
 	if desc:IsA("BasePart") then
@@ -285,7 +310,7 @@ for _, desc in ipairs(runeModel:GetDescendants()) do
 end
 
 if #runeParts == 0 then
-	warn("[BasicRuneTouch] El modelo Workspace.BasicRune no tiene BaseParts descendants.")
+	warn("[GoldRuneTouch] El modelo Workspace.ClientTapping.tapping.GoldRune no tiene BaseParts descendants.")
 end
 
 for _, part in ipairs(runeParts) do
@@ -294,8 +319,6 @@ for _, part in ipairs(runeParts) do
 			onTouchEnter(otherPart)
 		end
 	end)
-
-	-- TouchEnded existe en BasePart en engines recientes.
 	if part.TouchEnded then
 		part.TouchEnded:Connect(function(otherPart)
 			if otherPart then

@@ -7,7 +7,7 @@ local CritConfig = require(ReplicatedStorage.Shared:WaitForChild("TappingCritCon
 local GamePassConfig = require(ReplicatedStorage.Shared:WaitForChild("GamePassConfig"))
 local GamePassCheck = require(ReplicatedStorage.Shared:WaitForChild("GamePassCheck"))
 
-local MIN_LEVEL = 25
+local MIN_LEVEL = 15
 
 local rng = Random.new()
 

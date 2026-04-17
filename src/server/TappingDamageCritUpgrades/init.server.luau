@@ -4,7 +4,7 @@ local FloodCheck = require(game.ServerScriptService.Server:WaitForChild("RemoteF
 local DamageConfig = require(ReplicatedStorage.Shared:WaitForChild("TappingDamageConfig"))
 local CritConfig = require(ReplicatedStorage.Shared:WaitForChild("TappingCritConfig"))
 
-local MIN_LEVEL = 25
+local MIN_LEVEL = 15
 
 local damageEvent = ReplicatedStorage:WaitForChild("TappingDamageUpgradeRequest")
 local critEvent = ReplicatedStorage:WaitForChild("TappingCritUpgradeRequest")

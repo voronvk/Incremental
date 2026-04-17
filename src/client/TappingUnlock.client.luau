@@ -1,5 +1,5 @@
 --[[
-	Clona ReplicatedStorage.Tapping al Workspace solo para este cliente cuando Level >= MIN_LEVEL (25).
+	Clona ReplicatedStorage.Tapping al Workspace solo para este cliente cuando Level >= MIN_LEVEL (15).
 	El clon es local (no se replica al servidor ni a otros jugadores).
 	Si añades mecánicas con RemoteEvents, valida el mismo umbral en el servidor.
 ]]
@@ -7,7 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
-local MIN_LEVEL = 25
+local MIN_LEVEL = 15
 
 local player = Players.LocalPlayer
 local template = ReplicatedStorage:WaitForChild("Tapping")

@@ -40,6 +40,7 @@ local WARN_ANIM_DURATION = 0.3
 -- Recolección en mapa (CornFinder). Nombres en ReplicatedStorage.Shared.PlayerClientAttributes.
 local ATTR_AUTO_HARVEST = Attr.AUTO_HARVEST
 local ATTR_AUTO_HARVEST_GOLD = Attr.AUTO_HARVEST_GOLD
+local ATTR_RUNE_UNBOXING = "RuneUnboxingActive"
 
 -- Legado "Auto" / "AutoGold": promover si siguen en true. Si TappingZone ya fijó AutoHarvest, no pisar con nil.
 if player:GetAttribute(Attr.LEGACY_AUTO) == true then
@@ -423,6 +424,12 @@ end
 local function onAutoHarvestAttributeChanged()
 	updateButtonColor()
 	updateMovementBlock()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		stopAutoHarvest()
+		player:SetAttribute(ATTR_AUTO_HARVEST, false)
+		player:SetAttribute(ATTR_AUTO_HARVEST_GOLD, false)
+		return
+	end
 	if player:GetAttribute(ATTR_AUTO_HARVEST) == true then
 		task.defer(startAutoHarvest)
 	else
@@ -547,6 +554,10 @@ local function setAutoHarvestMode(isAuto: boolean, isGold: boolean)
 end
 
 bindFrameButton(basicButton, basicState, function()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		setAutoHarvestMode(false, false)
+		return
+	end
 	if not (GROUP_ID > 0 and player:IsInGroup(GROUP_ID)) then
 		playWarn()
 		return
@@ -559,6 +570,10 @@ bindFrameButton(basicButton, basicState, function()
 end)
 
 bindFrameButton(goldButton, goldState, function()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		setAutoHarvestMode(false, false)
+		return
+	end
 	if not hasGoldPass then
 		MarketplaceService:PromptGamePassPurchase(player, GOLD_GAMEPASS_ID)
 		task.spawn(function()
@@ -595,3 +610,12 @@ if goldContainer then
 		end
 	end)
 end
+
+player:GetAttributeChangedSignal(ATTR_RUNE_UNBOXING):Connect(function()
+	if player:GetAttribute(ATTR_RUNE_UNBOXING) == true then
+		setAutoHarvestMode(false, false)
+		stopAutoHarvest()
+		updateButtonColor()
+		updateMovementBlock()
+	end
+end)

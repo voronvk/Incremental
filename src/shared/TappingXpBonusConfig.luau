@@ -1,6 +1,6 @@
 --[[
 	Upgrade XpFrame (Tapping): XP por tap = 1 + nivel (0..MAX_LEVEL).
-	Coste: barato al inicio, curva más suave hasta ~nivel 40, luego sube más rápido (idle incremental).
+	Coste mas alto y curva mas empinada en la segunda mitad.
 ]]
 
 local M = {}
@@ -12,11 +12,11 @@ function M.costForNextLevel(currentLevel)
 		return 0
 	end
 	local L = currentLevel
-	if L < 40 then
-		return math.max(1, math.floor(5 * (1.122 ^ L)))
+	if L < 38 then
+		return math.max(1, math.floor(16 * (1.042 ^ L)))
 	end
-	local pivot = 5 * (1.122 ^ 39)
-	return math.max(1, math.floor(pivot * (1.19 ^ (L - 39))))
+	local pivot = 16 * (1.042 ^ 37)
+	return math.max(1, math.floor(pivot * (1.06 ^ (L - 37))))
 end
 
 return M

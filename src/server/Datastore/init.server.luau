@@ -10,7 +10,7 @@ local SCALE = 1e6
 local MAX_LOG = 308
 
 local currencyStats = {
-	"Corn", "Rebirths", "Gemeralds", "Gold", "Clicks", "Energy", "Keys",
+	"Corn", "Rebirths", "TappingRebirths", "Gemeralds", "Gold", "Clicks", "Energy", "Keys",
 	"CornLogged", "RebirthsLogged", "Ascensions", "BasicSeeds",
 	"SilverSeeds", "GoldenSeeds", "DiamondSeeds", "RubySeeds",
 }
@@ -36,7 +36,7 @@ local upgradeStats = {
 	"GoldTreeP1", "GoldTreeP2", "GoldTreeP3", "GoldTreeP4", "GoldTreeP5", "GoldTreeP6", "GoldTreeP7",
 }
 local eventStats = {
-	"TimesRebirthed", "Island1Bought", "Playtime", "Collects",
+	"TimesRebirthed", "TimesTappingRebirthed", "Island1Bought", "Playtime", "Collects",
 	"LevelRaw", "Level", "LastClaim", "Streak", "RobuxDonated",
 	-- Boosts temporales (Developer Products)
 	"MelonBoostEndTime", "RebirthBoostEndTime", "AscensionBoostEndTime", "SpeedBoostEndTime",
@@ -230,10 +230,19 @@ Players.PlayerAdded:Connect(function(player)
 		return cornDataStore:GetAsync(player.UserId)
 	end)
 
-	if success and data then
-		loadData(player, data)
+	if success and type(data) == "table" then
+		local loadOk, loadErr = pcall(function()
+			loadData(player, data)
+		end)
+		if not loadOk then
+			warn("[Datastore] loadData error para", player.Name, loadErr)
+		end
+	elseif success and data == nil then
+		-- Jugador nuevo: sin clave en el store; defaults ya creados.
+	elseif not success then
+		warn("[Datastore] GetAsync falló para", player.Name, data)
 	else
-		warn("Could not load data for", player.Name)
+		warn("[Datastore] Datos guardados con formato inesperado:", type(data), player.Name)
 	end
 
 	local drNext = player.Events:FindFirstChild("DailyRewardNextDay")

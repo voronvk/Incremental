@@ -1,8 +1,6 @@
 --[[
-	Rebirth en la PARCELA de Tapping (no RebirthBoard0 de Upgrades).
-	Ruta: workspace.ClientTapping.<jugador>/Plot/RebirthBoard → …
-	Reglas: RebirthRules.PlotRebirthBoard + PlotRebirthEvent.
-	Rebirth pide maíz (Currencies.Corn), no los "+Taps" del melón.
+	Prestigio **tapping** (parcela): PlotRebirthEvent → +TappingRebirths (fijo en servidor), reset solo minijuego.
+	No toca maíz, Rebirths ni RebirthBoard0 (eso es rebirthboard0GUI + RebirthEvent).
 ]]
 
 local Players = game:GetService("Players")
@@ -11,17 +9,16 @@ local SoundService = game:GetService("SoundService")
 
 local player = Players.LocalPlayer
 local currencies = player:WaitForChild("Currencies")
+local tappingRebirths = currencies:WaitForChild("TappingRebirths")
 local events = player:WaitForChild("Events")
-local corn = currencies:WaitForChild("Corn")
-local timesRebirthed = events:WaitForChild("TimesRebirthed")
 local melonLevel = events:WaitForChild("MelonLevel")
 
+local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 local RebirthRules = require(ReplicatedStorage.Shared:WaitForChild("RebirthRules"))
 local plotRules = RebirthRules.PlotRebirthBoard
 local plotRebirthEvent = ReplicatedStorage:WaitForChild("PlotRebirthEvent")
 
 local MIN_MELON_LEVEL = plotRules.MinMelonLevel
-local REBIRTH_MIN_CORN = plotRules.MinCorn
 
 local COLOR_LOCKED = Color3.fromRGB(58, 58, 58)
 local COLOR_READY = Color3.fromRGB(255, 75, 252)
@@ -93,11 +90,13 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 		return
 	end
 
-	local amountLabel = frameList:FindFirstChild("AmountLabel")
 	local rebirthFrame = frameList:FindFirstChild("RebirthFrame")
 	if not rebirthFrame then
 		return
 	end
+
+	local amountLabel = rebirthFrame:FindFirstChild("AmountLabel")
+		or frameList:FindFirstChild("AmountLabel")
 
 	local buttonFrame = rebirthFrame:FindFirstChild("ButtonFrame")
 	if not buttonFrame then
@@ -116,17 +115,17 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 
 	rebirthBoard:SetAttribute("PlotRebirthBoardBound", true)
 
-	local lastClickTime = 0
-	local DEBOUNCE = 5
+	local plotRebirthBusy = false
+	local PLOT_REBIRTH_CLICK_GAP = 0.35
 
 	local function canRebirth(): boolean
-		local melonOk = MIN_MELON_LEVEL <= 0 or melonLevel.Value >= MIN_MELON_LEVEL
-		return melonOk and corn.Value >= REBIRTH_MIN_CORN
+		return MIN_MELON_LEVEL <= 0 or melonLevel.Value >= MIN_MELON_LEVEL
 	end
 
 	local function updateAmount()
 		if amountLabel and (amountLabel:IsA("TextLabel") or amountLabel:IsA("TextButton")) then
-			amountLabel.Text = ("Rebirths: %d"):format(math.floor(timesRebirthed.Value))
+			local total = math.floor(tappingRebirths.Value)
+			amountLabel.Text = ("Tapping Rebirths: %s"):format(Abbreviate(total))
 		end
 	end
 
@@ -136,16 +135,11 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 		rebirthBtn.Active = ready
 		rebirthBtn.AutoButtonColor = ready
 		if ready then
-			btnLabel.Text = "Rebirth!"
+			btnLabel.Text = "Tapping Rebirth!"
 			btnLabel.TextSize = 47
 		else
 			if MIN_MELON_LEVEL > 0 and melonLevel.Value < MIN_MELON_LEVEL then
-				btnLabel.Text = ("Melon %d/%d for Rebirth."):format(math.floor(melonLevel.Value), MIN_MELON_LEVEL)
-			elseif corn.Value < REBIRTH_MIN_CORN then
-				btnLabel.Text = ("Corn: need %d (have %s). Not taps/melons."):format(
-					REBIRTH_MIN_CORN,
-					tostring(math.floor(corn.Value))
-				)
+				btnLabel.Text = ("Melon (tap) %d/%d"):format(math.floor(melonLevel.Value), MIN_MELON_LEVEL)
 			else
 				btnLabel.Text = "Can't rebirth yet."
 			end
@@ -160,21 +154,22 @@ local function bindPlotRebirthBoard(rebirthBoard: Instance)
 
 	refresh()
 
-	timesRebirthed:GetPropertyChangedSignal("Value"):Connect(refresh)
+	tappingRebirths:GetPropertyChangedSignal("Value"):Connect(refresh)
 	melonLevel:GetPropertyChangedSignal("Value"):Connect(refresh)
-	corn:GetPropertyChangedSignal("Value"):Connect(refresh)
 
 	local function onClick()
-		local now = tick()
-		if now - lastClickTime < DEBOUNCE then
+		if plotRebirthBusy then
 			return
 		end
 		if not canRebirth() then
 			return
 		end
-		lastClickTime = now
+		plotRebirthBusy = true
 		plotRebirthEvent:FireServer()
 		playRebirthSound()
+		task.delay(PLOT_REBIRTH_CLICK_GAP, function()
+			plotRebirthBusy = false
+		end)
 	end
 
 	if rebirthBtn:IsA("GuiButton") then

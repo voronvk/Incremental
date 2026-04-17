@@ -50,7 +50,7 @@
         "$className": "RemoteEvent"
       },
       "RebirthEvent": {
-        "$className": "RemoteEvent"
+        "$className": "RemoteFunction"
       },
       "PlotRebirthEvent": {
         "$className": "RemoteEvent"

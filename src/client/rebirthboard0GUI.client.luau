@@ -1,8 +1,6 @@
--- RebirthBoard0: Workspace.Upgrades.RebirthBoard0 -> UpgradeGUI -> UpgradeButton -> RebirthEvent.
--- UpgradeButton puede ser GuiButton o Frame con un GuiButton dentro. El servidor valida maiz.
---
--- Debug: en Studio sale print en Output. En vivo, pon atributo en tu personaje o en LocalPlayer:
---   player:SetAttribute("DebugRebirthGUI", true)
+-- SOLO rebirth de Upgrades / maíz: workspace…RebirthBoard0 → ReplicatedStorage.RebirthEvent (maíz → moneda Rebirths).
+-- No PlotRebirthEvent ni TappingRebirths; no requisitos del melón de tapping.
+-- InvokeServer / FireServer → { ok, reason?, gain? } si es RemoteFunction. Debug: SetAttribute("DebugRebirthGUI", true)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -11,6 +9,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local SoundService = game:GetService("SoundService")
 
 local RebirthRules = require(ReplicatedStorage.Shared:WaitForChild("RebirthRules"))
+local RebirthCornGain = require(ReplicatedStorage.Shared:WaitForChild("RebirthCornGain"))
 local upgradesRules = RebirthRules.UpgradesRebirthBoard
 
 local player = Players.LocalPlayer
@@ -19,7 +18,7 @@ local currencies = player:WaitForChild("Currencies")
 local events = player:WaitForChild("Events")
 local rebirths = currencies:WaitForChild("Rebirths")
 local corn = currencies:WaitForChild("Corn")
-local melonLevel = events:WaitForChild("MelonLevel")
+local timesRebirthed = events:WaitForChild("TimesRebirthed")
 
 local upgradeEvent = ReplicatedStorage:WaitForChild("RebirthEvent")
 
@@ -38,7 +37,6 @@ local function checkmuted()
 end
 
 local RebirthCost = upgradesRules.MinCorn
-local MIN_MELON_LEVEL_FOR_REBIRTH = upgradesRules.MinMelonLevel
 
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
 local upgTree1 = upgrades:WaitForChild("UpgTree1")
@@ -50,9 +48,11 @@ local function debugRebirthGuiEnabled()
 	return RunService:IsStudio() or player:GetAttribute("DebugRebirthGUI") == true
 end
 
+local LOG_TAG = "[RebirthBoard0·maíz]"
+
 local function dbg(msg)
 	if debugRebirthGuiEnabled() then
-		print("[rebirthGUI]", msg)
+		print(LOG_TAG, msg)
 	end
 end
 
@@ -66,7 +66,7 @@ local function dbgPickThrottled(detail)
 		return
 	end
 	lastPickFailLog = t
-	warn("[rebirthGUI] no bind: " .. detail)
+	warn(LOG_TAG .. " no bind RebirthBoard0: " .. detail)
 end
 
 local function packBoardAndClick(board, holder)
@@ -179,31 +179,131 @@ local function enableWorldLayerGui(g)
 	end
 end
 
-local lastClickTime = 0
-local DEBOUNCE_TIME = 0.35
+local rebirthInFlight = false
+local lastRebirthOkTime = 0
+local DEBOUNCE_AFTER_OK = 0.28
 local lastDebounceDbg = 0
+
+local function waitForPlayerDataLoaded(maxWaitSec: number)
+	local t0 = tick()
+	while player:GetAttribute("PlayerDataLoaded") ~= true and tick() - t0 < maxWaitSec do
+		task.wait(0.05)
+	end
+end
 
 local function fireRebirthAttempt()
 	local t = tick()
-	if t - lastClickTime < DEBOUNCE_TIME then
+	if rebirthInFlight then
 		if debugRebirthGuiEnabled() and t - lastDebounceDbg > 2 then
 			lastDebounceDbg = t
-			dbg("clic ignorado (debounce)")
+			dbg("clic ignorado (RebirthEvent maíz en curso)")
 		end
 		return
 	end
-	lastClickTime = t
-	if MIN_MELON_LEVEL_FOR_REBIRTH > 0 and melonLevel.Value < MIN_MELON_LEVEL_FOR_REBIRTH then
-		dbg("clic ignorado: melon " .. melonLevel.Value .. " < " .. MIN_MELON_LEVEL_FOR_REBIRTH)
+	if t - lastRebirthOkTime < DEBOUNCE_AFTER_OK then
+		if debugRebirthGuiEnabled() and t - lastDebounceDbg > 2 then
+			lastDebounceDbg = t
+			dbg("clic ignorado (poco después de rebirth maíz OK)")
+		end
 		return
 	end
+	waitForPlayerDataLoaded(45)
 	if corn.Value < RebirthCost then
-		dbg("clic: maiz cliente " .. corn.Value .. " < " .. RebirthCost .. " (no FireServer)")
+		dbg("clic: maiz cliente " .. corn.Value .. " < " .. RebirthCost .. " (no Invoke)")
 		return
 	end
-	dbg("FireServer RebirthEvent (maiz=" .. corn.Value .. ")")
-	upgradeEvent:FireServer()
-	sound:Play()
+
+	rebirthInFlight = true
+	task.spawn(function()
+		local okRun, runErr = pcall(function()
+			local ev = ReplicatedStorage:FindFirstChild("RebirthEvent") or upgradeEvent
+			if not ev then
+				warn(LOG_TAG .. " No hay RebirthEvent (maíz) en ReplicatedStorage")
+				return
+			end
+
+			if ev:IsA("RemoteFunction") then
+				local rf = ev :: RemoteFunction
+				local function invokeOnce()
+					return pcall(function()
+						return rf:InvokeServer()
+					end)
+				end
+
+				dbg("InvokeServer RebirthEvent — maíz cliente=" .. tostring(corn.Value))
+				local okInvoke, res = invokeOnce()
+				local cornRetries = 0
+				while okInvoke and type(res) == "table" and res.ok == false and res.reason == "corn_low_on_server" and cornRetries < 5 do
+					cornRetries += 1
+					task.wait(0.12)
+					okInvoke, res = invokeOnce()
+				end
+
+				if okInvoke and type(res) == "table" and res.ok == true then
+					lastRebirthOkTime = tick()
+					dbg("Rebirth maíz OK (gain Rebirths=" .. tostring(res.gain) .. ")")
+					sound:Play()
+				elseif okInvoke and type(res) == "table" then
+					warn(LOG_TAG .. " Rebirth maíz no aplicado:", tostring(res.reason))
+				else
+					warn(LOG_TAG .. " InvokeServer RebirthEvent (maíz) falló:", tostring(res))
+					if RunService:IsStudio() then
+						dbg("[Studio] Usa Play con servidor; solo Cliente no ejecuta OnServerInvoke.")
+					end
+				end
+			elseif ev:IsA("RemoteEvent") then
+				-- Lugar antiguo / sin Rojo: sigue siendo RemoteEvent; el servidor ya escucha OnServerEvent.
+				dbg(
+					"FireServer RebirthEvent (maíz) — RemoteEvent legacy; en Rojo preferible RemoteFunction"
+				)
+				local prevTimes = timesRebirthed.Value
+				local prevRebirths = rebirths.Value
+				local okFire, fireErr = pcall(function()
+					(ev :: RemoteEvent):FireServer()
+				end)
+				if not okFire then
+					warn(LOG_TAG .. " FireServer RebirthEvent (maíz) falló:", tostring(fireErr))
+					return
+				end
+				task.wait(0.05)
+				local deadline = tick() + 8
+				local okRebirth = false
+				while tick() < deadline do
+					if
+						timesRebirthed.Value > prevTimes
+						or corn.Value < RebirthCost
+						or rebirths.Value > prevRebirths
+					then
+						okRebirth = true
+						break
+					end
+					task.wait(0.03)
+				end
+				if okRebirth then
+					lastRebirthOkTime = tick()
+					dbg("Rebirth maíz OK (RemoteEvent; Rebirths/Corn/TimesRebirthed actualizados)")
+					sound:Play()
+				else
+					warn(
+						LOG_TAG
+							.. " Rebirth de maíz sin confirmar tras RebirthEvent:FireServer. Revisa servidor/RebirthEvent. "
+							.. "Esto no es PlotRebirth (tapping). TimesRebirthed="
+							.. tostring(timesRebirthed.Value)
+							.. ", Corn="
+							.. tostring(corn.Value)
+							.. ", Rebirths="
+							.. tostring(rebirths.Value)
+					)
+				end
+			else
+				warn(LOG_TAG .. " RebirthEvent (maíz) debe ser RemoteFunction o RemoteEvent; es:", ev.ClassName)
+			end
+		end)
+		if not okRun then
+			warn(LOG_TAG .. " error en rebirth maíz (excepción):", runErr)
+		end
+		rebirthInFlight = false
+	end)
 end
 
 local function tryBind()
@@ -222,7 +322,7 @@ local function tryBind()
 	disconnectAll()
 	boundBoard = upgradePart
 	boundButton = button
-	dbg("bind -> " .. button:GetFullName() .. " (board " .. upgradePart:GetFullName() .. ")")
+	dbg("bind RebirthBoard0 maíz -> " .. button:GetFullName() .. " (board " .. upgradePart:GetFullName() .. ")")
 
 	enableWorldLayerGui(button:FindFirstAncestorWhichIsA("SurfaceGui"))
 	enableWorldLayerGui(button:FindFirstAncestorWhichIsA("BillboardGui"))
@@ -275,39 +375,17 @@ local function tryBind()
 			return
 		end
 		local cost = getCost()
-		local playtime = events:WaitForChild("Playtime")
-		local upgTree1Now = upgrades:WaitForChild("UpgTree1")
-		local rebirthValueNow = upgrades:WaitForChild("RebirthValueUpg1")
-		local upgTree3 = upgrades:WaitForChild("UpgTree3")
-		local upgtree5 = upgrades:WaitForChild("UpgTree5")
-		local upgtree6 = upgrades:WaitForChild("UpgTree6")
-		local clickbooster = upgrades:WaitForChild("RebirthValueUpg2")
-		local rebirthenergy = upgrades:WaitForChild("RebirthEnergy")
-		local tier = upgrades:WaitForChild("Tier")
-		local upgtree2_3 = upgrades:WaitForChild("UpgTree2_3")
-
-		local mult1 = 2 ^ rebirthValueNow.Value
-		local mult2 = (upgTree1Now.Value == 1) and 2 or 1
-		local mult3 = (upgTree3.Value == 1) and 1.5 or 1
-		local mult4 = (upgtree5.Value == 1) and math.max(math.log(math.max(playtime.Value + 100, 1), 100), 1) or 1
-		local mult5 = (upgtree6.Value == 1) and 2 or 1
-		local mult6 = 2 ^ clickbooster.Value
-		local mult7 = ((rebirthenergy.Value + 1) ^ (1 / 5))
-		local mult8 = (tier.Value >= 1) and 2 or 1
-		local mult9 = GamePassCheck.playerOwnsGamePass(player, REBIRTHS_GAMEPASS_ID) and 2 or 1
-		local mult10 = (upgtree2_3.Value == 1) and 0.1 or 1
-
-		local bonus = math.floor(
-			(corn.Value / RebirthCost) * mult1 * mult2 * mult3 * mult4 * mult5 * mult6 * mult7 * mult8 * mult9 * mult10
+		-- Misma fórmula que el servidor (tier, árboles, boosts temporales, gamepass, GoldTreeP3, UpgTree2_10, etc.).
+		local bonus = RebirthCornGain.previewManualGain(
+			player,
+			corn.Value,
+			upgradesRules.CornChunkSize,
+			upgradesRules.MinCorn
 		)
-		effectLabel.Text = string.format("%s (+%s)", Abbreviate(math.floor(rebirths.Value)), Abbreviate(bonus))
-		levelLabel.Text = "Level: " .. tostring(rebirths.Value)
+		effectLabel.Text = string.format("Rebirths %s (+%s)", Abbreviate(math.floor(rebirths.Value)), Abbreviate(bonus))
+		levelLabel.Text = "Rebirths: " .. tostring(rebirths.Value)
 
-		local melonOk = true
-		if MIN_MELON_LEVEL_FOR_REBIRTH > 0 then
-			melonOk = melonLevel.Value >= MIN_MELON_LEVEL_FOR_REBIRTH
-		end
-		local canRebirth = corn.Value >= cost and melonOk
+		local canRebirth = corn.Value >= cost
 		if paintTarget:IsA("GuiObject") then
 			if canRebirth then
 				paintTarget.BackgroundColor3 = Color3.new(0, 1, 0)
@@ -327,10 +405,38 @@ local function tryBind()
 		table.insert(connections, corn:GetPropertyChangedSignal("Value"):Connect(updateLabel))
 		table.insert(connections, rebirthValue:GetPropertyChangedSignal("Value"):Connect(updateLabel))
 		table.insert(connections, upgTree1:GetPropertyChangedSignal("Value"):Connect(updateLabel))
-		table.insert(connections, melonLevel:GetPropertyChangedSignal("Value"):Connect(updateLabel))
+		local function connectIfValue(inst: Instance?, sig: string)
+			if inst and inst:IsA("ValueBase") then
+				table.insert(connections, inst:GetPropertyChangedSignal(sig):Connect(updateLabel))
+			end
+		end
+		connectIfValue(upgrades:FindFirstChild("UpgTree3"), "Value")
+		connectIfValue(upgrades:FindFirstChild("UpgTree5"), "Value")
+		connectIfValue(upgrades:FindFirstChild("UpgTree6"), "Value")
+		connectIfValue(upgrades:FindFirstChild("RebirthValueUpg2"), "Value")
+		connectIfValue(upgrades:FindFirstChild("RebirthEnergy"), "Value")
+		connectIfValue(upgrades:FindFirstChild("Tier"), "Value")
+		connectIfValue(upgrades:FindFirstChild("UpgTree2_3"), "Value")
+		connectIfValue(upgrades:FindFirstChild("UpgTree2_10"), "Value")
+		connectIfValue(upgrades:FindFirstChild("GoldTreeP3"), "Value")
+		connectIfValue(events:FindFirstChild("Playtime"), "Value")
+		local evBoostEnd = events:FindFirstChild("RebirthBoostEndTime")
+		local evBoostMul = events:FindFirstChild("RebirthBoostMultiplier")
+		local evLuckEnd = events:FindFirstChild("LuckAllBoostEndTime")
+		local evLuckAdd = events:FindFirstChild("LuckAllBoostAdd")
+		connectIfValue(evBoostEnd, "Value")
+		connectIfValue(evBoostMul, "Value")
+		connectIfValue(events:FindFirstChild("AscensionBoostEndTime"), "Value")
+		connectIfValue(events:FindFirstChild("AscensionBoostMultiplier"), "Value")
+		connectIfValue(evLuckEnd, "Value")
+		connectIfValue(evLuckAdd, "Value")
+		table.insert(
+			connections,
+			player:GetAttributeChangedSignal("OwnsGP_" .. tostring(REBIRTHS_GAMEPASS_ID)):Connect(updateLabel)
+		)
 	end
 
-	-- Solo Activated: MouseButton1Click + InputBegan duplican el mismo clic (varios FireServer por toque).
+	-- Solo Activated: evita doble InvokeServer por el mismo toque.
 	if button:IsA("GuiButton") then
 		local ca = button.Activated:Connect(fireRebirthAttempt)
 		table.insert(connections, ca)
@@ -421,7 +527,7 @@ task.spawn(function()
 	while true do
 		task.wait(3)
 		if not rebirthInputAlive() then
-			dbg("conexiones muertas: re-bind")
+			dbg("conexiones muertas: re-bind RebirthBoard0 (maíz)")
 			disconnectAll()
 			boundBoard = nil
 			boundButton = nil
