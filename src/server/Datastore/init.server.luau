@@ -226,9 +226,21 @@ Players.PlayerAdded:Connect(function(player)
 	createValues(settingsFolder, "NumberValue", settingsStats)
 	createValues(leaderstats, "NumberValue", leaderstatsStats)
 
-	local success, data = pcall(function()
-		return cornDataStore:GetAsync(player.UserId)
-	end)
+	local data: any = nil
+	local success = false
+	for attempt = 1, 4 do
+		local ok, res = pcall(function()
+			return cornDataStore:GetAsync(player.UserId)
+		end)
+		success = ok
+		data = res
+		if ok then
+			break
+		end
+		if attempt < 4 then
+			task.wait(0.35 * attempt)
+		end
+	end
 
 	if success and type(data) == "table" then
 		local loadOk, loadErr = pcall(function()

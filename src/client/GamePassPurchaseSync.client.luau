@@ -19,7 +19,9 @@ local function playUnlockSound()
 	s.Ended:Connect(function()
 		s:Destroy()
 	end)
-	s:Play()
+	pcall(function()
+		s:Play()
+	end)
 end
 
 local function showGlobalChatMessage(message)

@@ -1,5 +1,5 @@
 -- GoldRuneTouch.client.luau
--- Abre/cierra RuneGui.Frames.GoldRune al tocar Workspace.Tapping.GoldRune.
+-- Abre/cierra RuneGui.Frames.GoldRune al tocar GoldRune bajo workspace.ClientTapping.Tapping (solo nivel >= 15; TappingUnlock).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,32 +19,10 @@ local function ensureUIScale(guiObject: Instance): UIScale
 	return uiScale
 end
 
-local clientTapping = workspace:FindFirstChild("ClientTapping") or workspace:WaitForChild("ClientTapping", 60)
-if not clientTapping then
-	warn("[GoldRuneTouch] No existe Workspace.ClientTapping.")
-	return
-end
-
-local tappingFolder = clientTapping:FindFirstChild("tapping")
-	or clientTapping:FindFirstChild("Tapping")
-	or clientTapping:WaitForChild("tapping", 60)
-	or clientTapping:WaitForChild("Tapping", 60)
-if not tappingFolder then
-	warn("[GoldRuneTouch] No existe Workspace.ClientTapping.tapping.")
-	return
-end
-
-local runeModel = tappingFolder:FindFirstChild("GoldRune")
-if not runeModel then
-	runeModel = tappingFolder:FindFirstChild("GoldRune", true)
-end
-if not runeModel then
-	runeModel = tappingFolder:WaitForChild("GoldRune", 60)
-end
-if not runeModel then
-	warn("[GoldRuneTouch] No existe Workspace.ClientTapping.tapping.GoldRune.")
-	return
-end
+-- TappingUnlock crea ClientTapping y clona "Tapping" solo con Level >= 15; antes no hay carpeta Tapping.
+local holder = workspace:FindFirstChild("ClientTapping") or workspace:WaitForChild("ClientTapping", 120)
+local runeModel: Instance? = nil
+local touchesWired = false
 
 local playerGui = player:WaitForChild("PlayerGui")
 local runeGui = playerGui:WaitForChild("RuneGui")
@@ -153,12 +131,15 @@ local function pointInObb(cframe: CFrame, size: Vector3, worldPoint: Vector3): b
 end
 
 local function hrpStillNearRune(): boolean
+	if not runeModel then
+		return true
+	end
 	local hrp = character and character:FindFirstChild("HumanoidRootPart")
 	if not hrp or not hrp:IsA("BasePart") then
 		return true
 	end
 	local ok, cf, size = pcall(function()
-		return runeModel:GetBoundingBox()
+		return (runeModel :: Instance):GetBoundingBox()
 	end)
 	if not ok or typeof(cf) ~= "CFrame" or typeof(size) ~= "Vector3" then
 		return true
@@ -302,29 +283,59 @@ player.CharacterAdded:Connect(function(newCharacter)
 	hideUI()
 end)
 
-local runeParts = {}
-for _, desc in ipairs(runeModel:GetDescendants()) do
-	if desc:IsA("BasePart") then
-		table.insert(runeParts, desc)
+local function tryWireGoldRuneTouches()
+	if touchesWired or not holder then
+		return
 	end
-end
-
-if #runeParts == 0 then
-	warn("[GoldRuneTouch] El modelo Workspace.ClientTapping.tapping.GoldRune no tiene BaseParts descendants.")
-end
-
-for _, part in ipairs(runeParts) do
-	part.Touched:Connect(function(otherPart)
-		if otherPart then
-			onTouchEnter(otherPart)
+	local tappingFolder = holder:FindFirstChild("Tapping")
+	if not tappingFolder then
+		return
+	end
+	local m = tappingFolder:FindFirstChild("GoldRune", true)
+	if not (m and m:IsA("Model")) then
+		return
+	end
+	runeModel = m
+	local runeParts = {}
+	for _, desc in ipairs(m:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			table.insert(runeParts, desc)
 		end
-	end)
-	if part.TouchEnded then
-		part.TouchEnded:Connect(function(otherPart)
+	end
+	if #runeParts == 0 then
+		warn("[GoldRuneTouch] GoldRune sin BaseParts (revisa ReplicatedStorage.Tapping).")
+		return
+	end
+	touchesWired = true
+	for _, part in ipairs(runeParts) do
+		part.Touched:Connect(function(otherPart)
 			if otherPart then
-				onTouchExit(otherPart)
+				onTouchEnter(otherPart)
 			end
 		end)
+		if part.TouchEnded then
+			part.TouchEnded:Connect(function(otherPart)
+				if otherPart then
+					onTouchExit(otherPart)
+				end
+			end)
+		end
 	end
+end
+
+tryWireGoldRuneTouches()
+local eventsFolder = player:FindFirstChild("Events") or player:WaitForChild("Events", 60)
+if eventsFolder then
+	local levelInst = eventsFolder:FindFirstChild("Level") or eventsFolder:WaitForChild("Level", 30)
+	if levelInst and levelInst:IsA("ValueBase") then
+		levelInst:GetPropertyChangedSignal("Value"):Connect(tryWireGoldRuneTouches)
+	end
+end
+if holder then
+	holder.ChildAdded:Connect(function(c)
+		if c.Name == "Tapping" then
+			tryWireGoldRuneTouches()
+		end
+	end)
 end
 

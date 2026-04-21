@@ -19,7 +19,11 @@ local function ensureUIScale(guiObject: Instance): UIScale
 	return uiScale
 end
 
-local runeModel = workspace:WaitForChild("BasicRune")
+local runeModel = workspace:WaitForChild("BasicRune", 60)
+if not runeModel then
+	warn("[BasicRuneTouch] Sin Workspace.BasicRune tras 60s.")
+	return
+end
 
 -- UI (en PlayerGui)
 local playerGui = player:WaitForChild("PlayerGui")
@@ -131,7 +135,7 @@ local function hrpStillNearRune(): boolean
 		return true
 	end
 	local ok, cf, size = pcall(function()
-		return runeModel:GetBoundingBox()
+		return (runeModel :: Instance):GetBoundingBox()
 	end)
 	if not ok or typeof(cf) ~= "CFrame" or typeof(size) ~= "Vector3" then
 		return true
@@ -276,32 +280,66 @@ player.CharacterAdded:Connect(function(newCharacter)
 	hideUI()
 end)
 
--- Conectamos Touched/TouchEnded a TODOS los BaseParts del modelo.
-local runeParts = {}
-for _, desc in ipairs(runeModel:GetDescendants()) do
-	if desc:IsA("BasePart") then
-		table.insert(runeParts, desc)
-	end
-end
+local touchesWired = false
 
-if #runeParts == 0 then
-	warn("[BasicRuneTouch] El modelo Workspace.BasicRune no tiene BaseParts descendants.")
-end
-
-for _, part in ipairs(runeParts) do
-	part.Touched:Connect(function(otherPart)
-		if otherPart then
-			onTouchEnter(otherPart)
+local function collectRuneParts(): { BasePart }
+	local runeParts: { BasePart } = {}
+	for _, desc in ipairs(runeModel:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			table.insert(runeParts, desc)
 		end
-	end)
+	end
+	return runeParts
+end
 
-	-- TouchEnded existe en BasePart en engines recientes.
-	if part.TouchEnded then
-		part.TouchEnded:Connect(function(otherPart)
+local function wireRuneTouches(): boolean
+	if touchesWired then
+		return true
+	end
+	local runeParts = collectRuneParts()
+	if #runeParts == 0 then
+		return false
+	end
+	touchesWired = true
+	for _, part in ipairs(runeParts) do
+		part.Touched:Connect(function(otherPart)
 			if otherPart then
-				onTouchExit(otherPart)
+				onTouchEnter(otherPart)
 			end
 		end)
+		if part.TouchEnded then
+			part.TouchEnded:Connect(function(otherPart)
+				if otherPart then
+					onTouchExit(otherPart)
+				end
+			end)
+		end
 	end
+	return true
+end
+
+if not wireRuneTouches() then
+	local warned: boolean = false
+	local conn: RBXScriptConnection? = nil
+	conn = runeModel.DescendantAdded:Connect(function(d)
+		if touchesWired then
+			if conn then
+				conn:Disconnect()
+			end
+			return
+		end
+		if d:IsA("BasePart") and wireRuneTouches() and conn then
+			conn:Disconnect()
+		end
+	end)
+	task.delay(45, function()
+		if conn and conn.Connected then
+			conn:Disconnect()
+		end
+		if not touchesWired and not warned then
+			warned = true
+			warn("[BasicRuneTouch] BasicRune sigue sin BaseParts tras 45s (streaming o modelo vacío).")
+		end
+	end)
 end
 

@@ -8,8 +8,16 @@ local SoundService = game:GetService("SoundService")
 
 local player = game.Players.LocalPlayer
 local upgrades = player:WaitForChild("Upgrades")
-local events = player:FindFirstChild("Events")
-local level = events and events:WaitForChild("Level")
+local events = player:WaitForChild("Events", 60)
+if not events then
+	warn("[KernelBoardsGUI] Sin Events; kernels desactivados.")
+	return
+end
+local level = events:WaitForChild("Level", 60)
+if not level or not level:IsA("ValueBase") then
+	warn("[KernelBoardsGUI] Sin Events.Level.")
+	return
+end
 
 local upgradefolder = workspace:WaitForChild("Upgrades")
 local kernelFolder = upgradefolder:WaitForChild("KernelUpgrades")
@@ -47,6 +55,9 @@ local MAX_LEVEL = 50
 local COST = 1
 
 local function getUnspentKernels()
+	if not level or not level:IsA("ValueBase") then
+		return 0
+	end
 	local mult = (upgtree2_17.Value >= 1) and 1.25 or 1
 	local mult2 = (upgtree2_18.Value >= 1) and 1.25 or 1
 	return math.floor(level.Value * mult * mult2 - kernel1.Value - kernel2.Value - kernel3.Value - kernel4.Value - kernel5.Value)

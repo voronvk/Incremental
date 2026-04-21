@@ -4,7 +4,11 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local upgrades = player:WaitForChild("Upgrades")
 local currencies = player:WaitForChild("Currencies")
-local events = player:FindFirstChild("Events")
+local events = player:WaitForChild("Events", 60)
+if not events then
+	warn("[dailyboard] Sin carpeta Events; tablero diario desactivado.")
+	return
+end
 local rebirths = currencies:WaitForChild("Rebirths")
 local corn = currencies:WaitForChild("Corn")
 
@@ -15,7 +19,11 @@ local dailyGui = dailyBoard:WaitForChild("UpgradeGUI")
 local button = dailyGui:WaitForChild("UpgradeButton")
 local streaklabel = dailyGui:WaitForChild("StreakLabel")
 
-local Event = ReplicatedStorage:WaitForChild("DailyClaim")
+local Event = ReplicatedStorage:WaitForChild("DailyClaim", 30)
+if not Event or not Event:IsA("RemoteEvent") then
+	warn("[dailyboard] Sin ReplicatedStorage.DailyClaim.")
+	return
+end
 
 local SoundService = game:GetService("SoundService")
 local sound = Instance.new("Sound")
@@ -29,9 +37,16 @@ local function checkmuted()
 end
 sound.Parent = SoundService
 
+local streakValue = events:WaitForChild("Streak", 30)
+local lastClaimValue = events:WaitForChild("LastClaim", 30)
+if not (streakValue and streakValue:IsA("ValueBase") and lastClaimValue and lastClaimValue:IsA("ValueBase")) then
+	warn("[dailyboard] Faltan Events.Streak o Events.LastClaim.")
+	return
+end
+
 local function updateLabel()
-	local streak = events:WaitForChild("Streak")
-	local lastClaim = events:WaitForChild("LastClaim")
+	local streak = streakValue
+	local lastClaim = lastClaimValue
 	local timeNow = os.time()
 
 	local secondsSinceClaim = timeNow - lastClaim.Value
@@ -68,19 +83,18 @@ updateLabel()
 
 task.spawn(function()
 	while true do
-		updateLabel()
+		pcall(updateLabel)
 		task.wait(1)
 	end
 end)
 
 button.MouseButton1Click:Connect(function()
 	local timenow = os.time()
-	local lastclaim = events:WaitForChild("LastClaim")
-	if (timenow - lastclaim.Value) >= (24*60*60) then
+	if (timenow - lastClaimValue.Value) >= (24 * 60 * 60) then
 		Event:FireServer()
-		sound:Play()
-	else
-		print("blud")
+		pcall(function()
+			sound:Play()
+		end)
 	end
 end)
 
