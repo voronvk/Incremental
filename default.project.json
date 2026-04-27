@@ -52,6 +52,9 @@
       "RebirthEvent": {
         "$className": "RemoteFunction"
       },
+      "RebirthMaizeDone": {
+        "$className": "RemoteEvent"
+      },
       "PlotRebirthEvent": {
         "$className": "RemoteEvent"
       },

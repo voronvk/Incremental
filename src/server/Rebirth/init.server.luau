@@ -12,25 +12,19 @@ local function ensureRebirthEventIsRemoteFunction()
 		warn("[Rebirth] RebirthEvent es", existing.ClassName, "(se espera RemoteFunction).")
 		return
 	end
-	if not RunService:IsStudio() then
-		warn(
-			"[Rebirth] RebirthEvent sigue siendo RemoteEvent en producción; publica con Rojo (RemoteFunction) o sustituye el remoto en el lugar."
-		)
-		return
-	end
+	-- Migrar siempre: InvokeServer devuelve resultado al instante y evita flujos legacy frágiles en cliente.
 	existing:Destroy()
 	local rf = Instance.new("RemoteFunction")
 	rf.Name = "RebirthEvent"
 	rf.Parent = ReplicatedStorage
-	print("[Rebirth] Studio: RebirthEvent migrado RemoteEvent → RemoteFunction")
+	print("[Rebirth] RebirthEvent migrado RemoteEvent → RemoteFunction")
 end
 
 ensureRebirthEventIsRemoteFunction()
 
 -- NO bloquear todo el script si faltan (mapa viejo): antes el bind de RebirthEvent quedaba después y nunca se ejecutaba.
 local clearCornEvent: Instance? = nil
-local plotRebirthEvent: Instance? = nil
-local FloodCheck = require(ServerScriptService.Server:WaitForChild("RemoteFloodCheck") :: ModuleScript)
+local rebirthMaizeDone: RemoteEvent? = nil
 local RebirthRules = require(ReplicatedStorage.Shared:WaitForChild("RebirthRules"))
 local RebirthCornGain = require(ReplicatedStorage.Shared:WaitForChild("RebirthCornGain"))
 
@@ -40,7 +34,8 @@ local AUTO_GAIN_MIN_MELON = 100
 
 local MAX_SAFE_VALUE = 1e300
 -- Por float64 el producto chunks * mults puede ser inf/nan; sin esto el maíz se resetea y la moneda de prestigio casi no sube.
-local MAX_REBIRTHS_PER_MANUAL_ACTION = 1e20
+-- Debe alinearse con RebirthCornGain (tope por acción); antes 1e20 capaba como ~100Qn por rebirth.
+local MAX_REBIRTHS_PER_MANUAL_ACTION = MAX_SAFE_VALUE
 
 local function isFiniteNumber(n)
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
@@ -111,14 +106,14 @@ local function processManualRebirth(player, rules)
 	-- Varios intentos: el maíz en servidor a veces va varios ticks por detrás del cliente.
 	local chunks = 0
 	local cornOk = false
-	for attempt = 1, 3 do
+	for attempt = 1, 8 do
 		chunks = math.floor(corn.Value / chunkSize)
 		if chunks >= 1 and corn.Value >= rules.MinCorn then
 			cornOk = true
 			break
 		end
-		if attempt < 3 then
-			task.wait(0.08)
+		if attempt < 8 then
+			task.wait(0.12)
 		end
 	end
 	if not cornOk then
@@ -164,86 +159,34 @@ local function processManualRebirth(player, rules)
 	return { ok = true, gain = gainRounded }
 end
 
--- Prestigio solo minijuego tapping: +TappingRebirths fijo, reset melón/taps/upgrades de tapping. No maíz ni Rebirths.
-local function processTappingPlotRebirth(player)
-	local rules = RebirthRules.PlotRebirthBoard
-	local currencies = player:FindFirstChild("Currencies")
-	local events = player:FindFirstChild("Events")
-	local leaderstats = player:FindFirstChild("leaderstats")
+local function ensureRebirthMaizeAckRemote(): RemoteEvent?
+	local x = ReplicatedStorage:FindFirstChild("RebirthMaizeDone")
+	if x and x:IsA("RemoteEvent") then
+		return x
+	end
+	if x ~= nil then
+		warn("[Rebirth] RebirthMaizeDone existe pero no es RemoteEvent:", x.ClassName)
+		return nil
+	end
+	local e = Instance.new("RemoteEvent")
+	e.Name = "RebirthMaizeDone"
+	e.Parent = ReplicatedStorage
+	print("[Rebirth] Creado RebirthMaizeDone (faltaba en ReplicatedStorage).")
+	return e
+end
 
-	if not currencies or not events or not leaderstats then
-		rebirthDebug(player, "PlotRebirth (tapping) reject: faltan Currencies/Events/leaderstats")
+local function fireRebirthMaizeAck(player: Player, res: { ok: boolean, reason: string?, gain: number? }?)
+	if not (rebirthMaizeDone and rebirthMaizeDone.Parent) then
+		rebirthMaizeDone = ensureRebirthMaizeAckRemote()
+	end
+	if not rebirthMaizeDone then
 		return
 	end
-
-	local taps = leaderstats:FindFirstChild("Taps")
-	local tappingRebirths = currencies:FindFirstChild("TappingRebirths")
-	local timesTappingRebirthed = events:FindFirstChild("TimesTappingRebirthed")
-	local melonLevel = events:FindFirstChild("MelonLevel")
-	local melonXp = events:FindFirstChild("MelonXp")
-	local dmg = events:FindFirstChild("TappingDamageLevel")
-	local xpB = events:FindFirstChild("TappingXpBonus")
-	local crit = events:FindFirstChild("TappingCritLevel")
-
-	if not taps or not taps:IsA("NumberValue") then
-		rebirthDebug(player, "PlotRebirth (tapping) reject: sin leaderstats.Taps")
-		return
-	end
-	if not tappingRebirths or not tappingRebirths:IsA("NumberValue") then
-		rebirthDebug(player, "PlotRebirth (tapping) reject: sin TappingRebirths")
-		return
-	end
-	if not timesTappingRebirthed or not timesTappingRebirthed:IsA("NumberValue") then
-		rebirthDebug(player, "PlotRebirth (tapping) reject: sin TimesTappingRebirthed")
-		return
-	end
-
-	if rules.MinMelonLevel > 0 then
-		if not melonLevel or melonLevel.Value < rules.MinMelonLevel then
-			rebirthDebug(
-				player,
-				"PlotRebirth (tapping) reject: MelonLevel "
-					.. (melonLevel and melonLevel.Value or "nil")
-					.. " < "
-					.. rules.MinMelonLevel
-			)
-			return
-		end
-	end
-
-	local gainFixed = rules.TappingRebirthGainFixed
-	if type(gainFixed) ~= "number" or gainFixed < 1 then
-		gainFixed = 1
-	end
-	gainFixed = math.floor(gainFixed)
-
-	addRebirthCurrency(tappingRebirths, gainFixed)
-	timesTappingRebirthed.Value = timesTappingRebirthed.Value + 1
-
-	taps.Value = 0
-	if melonLevel and melonLevel:IsA("ValueBase") then
-		melonLevel.Value = 1
-	end
-	local mx = melonXp or events:FindFirstChild("MelonXp")
-	if mx and mx:IsA("ValueBase") then
-		mx.Value = 0
-	end
-	if dmg and dmg:IsA("ValueBase") then
-		dmg.Value = 0
-	end
-	if xpB and xpB:IsA("ValueBase") then
-		xpB.Value = 0
-	end
-	if crit and crit:IsA("ValueBase") then
-		crit.Value = 0
-	end
-
-	rebirthDebug(
-		player,
-		"OK PlotRebirth tapping → TappingRebirths: +"
-			.. gainFixed
-			.. " (fijo); reset solo taps/melón/upgrades tapping (sin tocar maíz ni Rebirths)"
-	)
+	local ok = res and res.ok == true
+	local reason = (res and type(res.reason) == "string" and res.reason) or ""
+	pcall(function()
+		rebirthMaizeDone:FireClient(player, ok, reason)
+	end)
 end
 
 local rebirthMaizeBound: { [Instance]: boolean } = {}
@@ -267,32 +210,54 @@ local function bindUpgradeBoardRebirth(ev: Instance)
 			local ok, res = pcall(processManualRebirth, player, UPGRADES_REBIRTH_RULES)
 			if not ok then
 				warn("[Rebirth srv] ERROR UpgradesRebirthBoard:", player and player.Name or "?", tostring(res))
-				return { ok = false, reason = "server_exception" }
+				local fail = { ok = false, reason = "server_exception" }
+				fireRebirthMaizeAck(player, fail)
+				return fail
 			end
 			if type(res) ~= "table" then
-				return { ok = false, reason = "bad_result" }
+				local fail = { ok = false, reason = "bad_result" }
+				fireRebirthMaizeAck(player, fail)
+				return fail
 			end
+			fireRebirthMaizeAck(player, res)
 			return res
 		end
 	elseif ev:IsA("RemoteEvent") then
 		-- Mapas viejos con RemoteEvent: mismo procesamiento, sin retorno al cliente.
 		ev.OnServerEvent:Connect(function(player)
 			rebirthDebug(player, "OnServerEvent UpgradesRebirthBoard (legacy)")
-			local ok, err = pcall(processManualRebirth, player, UPGRADES_REBIRTH_RULES)
-			if not ok then
-				warn("[Rebirth srv] ERROR UpgradesRebirthBoard:", player and player.Name or "?", tostring(err))
+			local invokeOk, payload = pcall(processManualRebirth, player, UPGRADES_REBIRTH_RULES)
+			local res: { ok: boolean, reason: string?, gain: number? }
+			if invokeOk then
+				res = payload :: any
+			else
+				warn("[Rebirth srv] ERROR UpgradesRebirthBoard:", player and player.Name or "?", tostring(payload))
+				res = { ok = false, reason = "server_exception" }
 			end
+			if type(res) ~= "table" then
+				res = { ok = false, reason = "bad_result" }
+			end
+			fireRebirthMaizeAck(player, res)
 		end)
 	end
 end
 
+rebirthMaizeDone = ensureRebirthMaizeAckRemote()
+
 local rebirthEvent0 = ReplicatedStorage:WaitForChild("RebirthEvent", 60)
 if rebirthEvent0 then
-	-- Quitar marca vieja que podía bloquear el bind por replicación desde cliente.
-	pcall(function()
-		rebirthEvent0:SetAttribute("_RebirthMaizeSrv", nil)
-	end)
-	bindUpgradeBoardRebirth(rebirthEvent0)
+	-- Si RebirthEvent era nil en el primer ensure(), aquí puede ser RemoteEvent viejo: migrar antes de bind.
+	ensureRebirthEventIsRemoteFunction()
+	rebirthEvent0 = ReplicatedStorage:WaitForChild("RebirthEvent", 5)
+	if not rebirthEvent0 then
+		warn("[Rebirth] RebirthEvent no reapareció tras migración (5s); rebirth maíz desactivado.")
+	else
+		-- Quitar marca vieja que podía bloquear el bind por replicación desde cliente.
+		pcall(function()
+			rebirthEvent0:SetAttribute("_RebirthMaizeSrv", nil)
+		end)
+		bindUpgradeBoardRebirth(rebirthEvent0)
+	end
 else
 	warn("[Rebirth] Timeout esperando RebirthEvent (60s). Rebirth maíz desactivado hasta que exista.")
 end
@@ -301,10 +266,15 @@ ReplicatedStorage.ChildAdded:Connect(function(ch)
 		return
 	end
 	task.defer(function()
+		ensureRebirthEventIsRemoteFunction()
+		local ev = ReplicatedStorage:FindFirstChild("RebirthEvent")
+		if not ev then
+			return
+		end
 		pcall(function()
-			ch:SetAttribute("_RebirthMaizeSrv", nil)
+			ev:SetAttribute("_RebirthMaizeSrv", nil)
 		end)
-		bindUpgradeBoardRebirth(ch)
+		bindUpgradeBoardRebirth(ev)
 	end)
 end)
 
@@ -312,24 +282,7 @@ clearCornEvent = ReplicatedStorage:WaitForChild("ClearLocalCornEvent", 8)
 if not clearCornEvent then
 	warn("[Rebirth] Sin ClearLocalCornEvent tras 8s; rebirth maíz sigue, sin limpiar maíz local del cliente.")
 end
-plotRebirthEvent = ReplicatedStorage:WaitForChild("PlotRebirthEvent", 8)
-if plotRebirthEvent and plotRebirthEvent:IsA("RemoteEvent") then
-	plotRebirthEvent.OnServerEvent:Connect(function(player)
-		if not FloodCheck:Check(player, plotRebirthEvent :: RemoteEvent, 10) then
-			return
-		end
-		local ok, err = pcall(function()
-			processTappingPlotRebirth(player)
-		end)
-		if not ok then
-			warn("[Rebirth srv] ERROR PlotRebirth (tapping):", player and player.Name or "?", tostring(err))
-		end
-	end)
-elseif plotRebirthEvent then
-	warn("[Rebirth] PlotRebirthEvent no es RemoteEvent:", plotRebirthEvent.ClassName)
-else
-	warn("[Rebirth] Sin PlotRebirthEvent tras 8s; rebirth de parcela desactivado.")
-end
+-- PlotRebirthEvent / tapping prestige: desactivado (RebirthRules.PlotRebirthBoard.Enabled = false).
 
 task.spawn(function()
 	while true do

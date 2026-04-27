@@ -22,6 +22,25 @@ local timesRebirthed = events:WaitForChild("TimesRebirthed")
 
 local upgradeEvent = ReplicatedStorage:WaitForChild("RebirthEvent")
 
+local function getMaizeRebirthRemote(): Instance?
+	local ev = ReplicatedStorage:FindFirstChild("RebirthEvent")
+	if ev and ev.Parent == ReplicatedStorage then
+		return ev
+	end
+	if upgradeEvent.Parent == ReplicatedStorage then
+		return upgradeEvent
+	end
+	return ReplicatedStorage:FindFirstChild("RebirthEvent")
+end
+
+local function getMaizeAckRemote(): RemoteEvent?
+	local x = ReplicatedStorage:FindFirstChild("RebirthMaizeDone")
+	if x and x:IsA("RemoteEvent") then
+		return x
+	end
+	return nil
+end
+
 local sound = Instance.new("Sound")
 sound.SoundId = "rbxassetid://140206660137491"
 sound.Parent = SoundService
@@ -184,6 +203,12 @@ local lastRebirthOkTime = 0
 local DEBOUNCE_AFTER_OK = 0.28
 local lastDebounceDbg = 0
 
+-- Breve: no bloquear el botón varios segundos (antes 45s + 20s migración + 8s legacy).
+local PLAYER_DATA_WAIT_SEC = 1.2
+local REBIRTH_RF_WAIT_SEC = 1.5
+local REBIRTH_LEGACY_WAIT_SEC = 4
+local REBIRTH_INVOKE_TIMEOUT_SEC = 8
+
 local function waitForPlayerDataLoaded(maxWaitSec: number)
 	local t0 = tick()
 	while player:GetAttribute("PlayerDataLoaded") ~= true and tick() - t0 < maxWaitSec do
@@ -191,12 +216,33 @@ local function waitForPlayerDataLoaded(maxWaitSec: number)
 	end
 end
 
+local function invokeRebirthWithTimeout(rf: RemoteFunction, timeoutSec: number): (boolean, boolean, any)
+	local done = false
+	local pOk, pRes = false, nil :: any
+	task.spawn(function()
+		local ok, res = pcall(function()
+			return rf:InvokeServer()
+		end)
+		pOk = ok
+		pRes = res
+		done = true
+	end)
+	local t0 = tick()
+	while not done and tick() - t0 < timeoutSec do
+		task.wait(0.05)
+	end
+	if done then
+		return true, pOk, pRes
+	end
+	return false, false, nil
+end
+
 local function fireRebirthAttempt()
 	local t = tick()
 	if rebirthInFlight then
 		if debugRebirthGuiEnabled() and t - lastDebounceDbg > 2 then
 			lastDebounceDbg = t
-			dbg("clic ignorado (RebirthEvent maíz en curso)")
+			dbg("clic ignorado (rebirth maíz en curso)")
 		end
 		return
 	end
@@ -207,36 +253,66 @@ local function fireRebirthAttempt()
 		end
 		return
 	end
-	waitForPlayerDataLoaded(45)
-	if corn.Value < RebirthCost then
-		dbg("clic: maiz cliente " .. corn.Value .. " < " .. RebirthCost .. " (no Invoke)")
-		return
-	end
 
 	rebirthInFlight = true
 	task.spawn(function()
 		local okRun, runErr = pcall(function()
-			local ev = ReplicatedStorage:FindFirstChild("RebirthEvent") or upgradeEvent
+			waitForPlayerDataLoaded(PLAYER_DATA_WAIT_SEC)
+			if corn.Value < RebirthCost then
+				dbg("clic: maiz cliente " .. corn.Value .. " < " .. RebirthCost .. " (no Invoke)")
+				return
+			end
+
+			local ev = getMaizeRebirthRemote()
 			if not ev then
 				warn(LOG_TAG .. " No hay RebirthEvent (maíz) en ReplicatedStorage")
 				return
 			end
 
+			-- Breve poll: la migración a RemoteFunction replica en ~0–2s en Play.
+			if ev:IsA("RemoteEvent") then
+				local w0 = tick()
+				while ev:IsA("RemoteEvent") and tick() - w0 < REBIRTH_RF_WAIT_SEC do
+					task.wait(0.08)
+					ev = getMaizeRebirthRemote()
+					if not ev then
+						warn(LOG_TAG .. " RebirthEvent desapareció mientras se esperaba RemoteFunction.")
+						return
+					end
+				end
+			end
+
 			if ev:IsA("RemoteFunction") then
 				local rf = ev :: RemoteFunction
+
 				local function invokeOnce()
-					return pcall(function()
-						return rf:InvokeServer()
-					end)
+					local finished, pOk, pRes = invokeRebirthWithTimeout(rf, REBIRTH_INVOKE_TIMEOUT_SEC)
+					if not finished then
+						return false, "invoke_timeout"
+					end
+					return pOk, pRes
 				end
 
 				dbg("InvokeServer RebirthEvent — maíz cliente=" .. tostring(corn.Value))
 				local okInvoke, res = invokeOnce()
+				if okInvoke == false and res == "invoke_timeout" then
+					warn(
+						LOG_TAG
+							.. " InvokeServer no respondió en "
+							.. REBIRTH_INVOKE_TIMEOUT_SEC
+							.. "s (¿sin servidor / Play?)."
+					)
+					return
+				end
 				local cornRetries = 0
-				while okInvoke and type(res) == "table" and res.ok == false and res.reason == "corn_low_on_server" and cornRetries < 5 do
+				while okInvoke and type(res) == "table" and res.ok == false and res.reason == "corn_low_on_server" and cornRetries < 10 do
 					cornRetries += 1
-					task.wait(0.12)
+					task.wait(0.14)
 					okInvoke, res = invokeOnce()
+					if okInvoke == false and res == "invoke_timeout" then
+						warn(LOG_TAG .. " InvokeServer timeout en reintento maíz.")
+						break
+					end
 				end
 
 				if okInvoke and type(res) == "table" and res.ok == true then
@@ -252,23 +328,47 @@ local function fireRebirthAttempt()
 					end
 				end
 			elseif ev:IsA("RemoteEvent") then
-				-- Lugar antiguo / sin Rojo: sigue siendo RemoteEvent; el servidor ya escucha OnServerEvent.
+				-- Legacy: sin retorno directo; ACK opcional + heurística en el mismo bucle (no esperar ACK 8s y luego 8s a réplica).
 				dbg(
-					"FireServer RebirthEvent (maíz) — RemoteEvent legacy; en Rojo preferible RemoteFunction"
+					"FireServer RebirthEvent (maíz) — RemoteEvent legacy; el servidor debería migrar a RemoteFunction"
 				)
 				local prevTimes = timesRebirthed.Value
 				local prevRebirths = rebirths.Value
+				local ack = getMaizeAckRemote()
+				local ackReceived = false
+				local ackOk = false
+				local gotReason = ""
+				local ackConn: RBXScriptConnection? = nil
+				if ack and ack:IsA("RemoteEvent") then
+					ackConn = (ack :: RemoteEvent).OnClientEvent:Connect(function(serverOk: boolean?, reason: string?)
+						ackReceived = true
+						ackOk = serverOk == true
+						gotReason = type(reason) == "string" and reason or ""
+					end)
+				end
 				local okFire, fireErr = pcall(function()
 					(ev :: RemoteEvent):FireServer()
 				end)
 				if not okFire then
+					if ackConn then
+						ackConn:Disconnect()
+					end
 					warn(LOG_TAG .. " FireServer RebirthEvent (maíz) falló:", tostring(fireErr))
 					return
 				end
-				task.wait(0.05)
-				local deadline = tick() + 8
+				local deadline = tick() + REBIRTH_LEGACY_WAIT_SEC
 				local okRebirth = false
+				local rejected = false
 				while tick() < deadline do
+					if ackConn and ackReceived then
+						if ackOk then
+							okRebirth = true
+						else
+							rejected = true
+							warn(LOG_TAG .. " Rebirth maíz rechazado (servidor):", gotReason ~= "" and gotReason or "(sin razón)")
+						end
+						break
+					end
 					if
 						timesRebirthed.Value > prevTimes
 						or corn.Value < RebirthCost
@@ -279,15 +379,17 @@ local function fireRebirthAttempt()
 					end
 					task.wait(0.03)
 				end
+				if ackConn then
+					ackConn:Disconnect()
+				end
 				if okRebirth then
 					lastRebirthOkTime = tick()
-					dbg("Rebirth maíz OK (RemoteEvent; Rebirths/Corn/TimesRebirthed actualizados)")
+					dbg("Rebirth maíz OK (RemoteEvent + servidor)")
 					sound:Play()
-				else
+				elseif not rejected then
 					warn(
 						LOG_TAG
-							.. " Rebirth de maíz sin confirmar tras RebirthEvent:FireServer. Revisa servidor/RebirthEvent. "
-							.. "Esto no es PlotRebirth (tapping). TimesRebirthed="
+							.. " Rebirth de maíz sin confirmar (RemoteEvent). ¿Solo cliente sin Play? ¿Script Server/Rebirth? Maíz cliente vs servidor desincronizado (reintenta). TimesRebirthed="
 							.. tostring(timesRebirthed.Value)
 							.. ", Corn="
 							.. tostring(corn.Value)

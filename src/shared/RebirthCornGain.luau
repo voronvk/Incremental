@@ -1,12 +1,13 @@
 --[[
 	Ganancia de moneda **Rebirths** (mapa / maíz): manual por chunks de maíz o pasivo por maíz total.
 	Servidor: rebirth maíz (RebirthEvent), bucle pasivo. Cliente: vista previa RebirthBoard0.
-	No aplica al prestigio tapping (TappingRebirths fijo en Rebirth server).
+	No aplica al prestigio tapping en parcela (PlotRebirthBoard desactivado).
 ]]
 
 local REBIRTHS_GAMEPASS_ID = 1740115835
-local MAX_MANUAL_OR_PASSIVE_GAIN = 1e20
+-- Mismo techo que el stock (NumberValue / float64). Antes 1e20 (~100Qn) capaba cada ganancia manual/pasiva.
 local MAX_SAFE = 1e300
+local MAX_MANUAL_OR_PASSIVE_GAIN = MAX_SAFE
 
 local function isFinite(n: number): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge

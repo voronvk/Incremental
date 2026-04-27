@@ -1,10 +1,16 @@
 --[[
-	Prestigio **tapping** (parcela): PlotRebirthEvent → +TappingRebirths (fijo en servidor), reset solo minijuego.
-	No toca maíz, Rebirths ni RebirthBoard0 (eso es rebirthboard0GUI + RebirthEvent).
+	Prestigio tapping en parcela (PlotRebirthEvent → TappingRebirths): desactivado vía RebirthRules.PlotRebirthBoard.Enabled.
+	El rebirth de maíz / Rebirths sigue en rebirthboard0GUI + RebirthEvent.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local RebirthRules = require(ReplicatedStorage.Shared:WaitForChild("RebirthRules"))
+if RebirthRules.PlotRebirthBoard.Enabled ~= true then
+	return
+end
+
 local SoundService = game:GetService("SoundService")
 
 local player = Players.LocalPlayer
@@ -14,7 +20,6 @@ local events = player:WaitForChild("Events")
 local melonLevel = events:WaitForChild("MelonLevel")
 
 local Abbreviate = require(ReplicatedStorage:WaitForChild("Abbreviate"))
-local RebirthRules = require(ReplicatedStorage.Shared:WaitForChild("RebirthRules"))
 local plotRules = RebirthRules.PlotRebirthBoard
 local plotRebirthEvent = ReplicatedStorage:WaitForChild("PlotRebirthEvent")
 
